@@ -1,4 +1,5 @@
 ﻿using Flickoo.Api.Data;
+using Flickoo.Api.DTOs;
 using Flickoo.Api.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,7 +17,7 @@ namespace Flickoo.Api.Controllers
         }
         // GET: api/<UserController>
         [HttpGet("{id}")]
-        public async Task<ActionResult<User>> Get(long id)
+        public async Task<ActionResult<User>> Get([FromRoute] long id)
         {
             var findUser = await _dBContext.Users
                 .AsNoTracking()
@@ -25,11 +26,27 @@ namespace Flickoo.Api.Controllers
             if (findUser == null)
                 return NotFound();
 
-            return Ok(findUser);
+            var response = new GetUserResponse
+            {
+                Username = findUser.Username,
+                LocationName = findUser.Location.Name
+            };
+
+            return Ok(response);
         }
 
-        [HttpGet("MyProducts")]
-        public async Task<ActionResult<ICollection<Product>>> GetAllUserProducts(long id)
+        [HttpGet("check/{id}")]
+        public async Task<ActionResult<bool>> CheckUser([FromRoute] long id)
+        {
+            if (id == 0) return BadRequest("Id is not valid");
+
+            var userExists = await _dBContext.Users.AnyAsync(u => u.Id == id);
+            
+            return Ok(userExists);
+        }
+
+        [HttpGet("myProducts/{id}")]
+        public async Task<ActionResult<ICollection<Product>>> GetUserProducts([FromRoute] long id)
         {
             var productList = await _dBContext.Products
                 .Where(p => p.UserId == id)
@@ -41,19 +58,32 @@ namespace Flickoo.Api.Controllers
 
         // POST api/<UserController>
         [HttpPost]
-        public async Task<ActionResult> Post(User user)
+        public async Task<ActionResult> Post([FromBody] CreateUserRequest request)
         {
-            if (string.IsNullOrEmpty(user.Username) || string.IsNullOrEmpty(user.PhoneNumber))
-                return BadRequest();
+            var locationExists = await _dBContext.Locations
+                .FirstOrDefaultAsync(l => l.Name == request.LocationName);
 
-            if (await _dBContext.Users.AnyAsync(u => u.Id == user.Id))
+            if (locationExists == null)
+            { 
+                var newLocation = new Location
+                {
+                    Name = request.LocationName
+                };
+                await _dBContext.Locations.AddAsync(newLocation);
+                await _dBContext.SaveChangesAsync();
+            }
+
+            if (string.IsNullOrEmpty(request.Username))
+                return BadRequest("Username is null or empty");
+
+            if (await _dBContext.Users.AnyAsync(u => u.Id == request.Id))
                 return BadRequest("User with this id already exists.");
 
             var newUser = new User
             {
-                Id = user.Id,
-                Username = user.Username,
-                PhoneNumber = user.PhoneNumber
+                Id = request.Id,
+                Username = request.Username,
+                LocationId = locationId
             };
 
             await _dBContext.Users.AddAsync(newUser);
@@ -65,21 +95,23 @@ namespace Flickoo.Api.Controllers
 
         // PUT api/<UserController>/5
         [HttpPut("{id}")]
-        public async Task<ActionResult> Put(long id, string userName, string phoneNumber)
+        public async Task<ActionResult> Put(long id, string? userName)
         {
-            var userExists = await _dBContext.Users.AnyAsync(u => u.Id == id);
-            if (!userExists)
-                return NotFound();
+            var userExists = await _dBContext.Users.FirstOrDefaultAsync(u => u.Id == id);
+            if (userExists == null)
+                return NotFound("User not found");
 
-            if (string.IsNullOrEmpty(userName) || string.IsNullOrEmpty(phoneNumber))
-                return BadRequest("Username and phone number cannot be empty.");
+            if (string.IsNullOrEmpty(userName))
+                return BadRequest("no update data");
+
+            if (string.IsNullOrEmpty(userName))
+                userName = userExists.Username;
 
 
-            await _dBContext.Users
+                await _dBContext.Users
                 .Where(u => u.Id == id)
                 .ExecuteUpdateAsync(u => u
                     .SetProperty(u => u.Username, userName)
-                    .SetProperty(u => u.PhoneNumber, phoneNumber)
                     );
 
           
@@ -90,8 +122,8 @@ namespace Flickoo.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<ActionResult> Delete(long id)
         {
-            var findUser = await _dBContext.Users.FirstOrDefaultAsync(u => u.Id == id);
-            if (findUser == null)
+            var findUser = await _dBContext.Users.AnyAsync(u => u.Id == id);
+            if (!findUser)
                 return NotFound();
  
             await _dBContext.Users

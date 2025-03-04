@@ -7,7 +7,7 @@
         public FileType TypeOfFile { get; set; }
 
         public long ProductId { get; set; }
-        public required Product Product { get; set; }
+        public Product Product { get; set; }
     }
     public enum FileType
     {

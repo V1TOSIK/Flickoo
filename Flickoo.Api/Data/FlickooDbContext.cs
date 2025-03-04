@@ -23,6 +23,7 @@ namespace Flickoo.Api.Data
         public DbSet<Like> Likes { get; set; }
         public DbSet<Category> Categories { get; set; }
         public DbSet<MediaFile> MediaFiles { get; set; }
+        public DbSet<Location> Locations { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

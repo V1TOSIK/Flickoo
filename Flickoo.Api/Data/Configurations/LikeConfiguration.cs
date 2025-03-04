@@ -10,6 +10,7 @@ namespace Flickoo.Api.Data.Configurations
         {
             builder.ToTable("Likes").HasKey(l => l.Id);
             builder.Property(l => l.Id).HasColumnName("LikeId");
+            builder.Property(l => l.CreatedAt).IsRequired();
             builder.HasOne(l => l.Product)
                 .WithMany(p => p.Likes)
                 .HasForeignKey(l => l.ProductId)
