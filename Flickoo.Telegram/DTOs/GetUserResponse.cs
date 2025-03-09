@@ -1,8 +1,8 @@
 ﻿namespace Flickoo.Telegram.DTOs
 {
-    class GetUserResponse
+    public class GetUserResponse
     {
         public string Username { get; set; } = string.Empty;
-        public string PhoneNumber { get; set; } = string.Empty;
+        public string LocationName { get; set; } = string.Empty;
     }
 }

@@ -1,4 +1,6 @@
-using FlickooBot;
+using Flickoo.Telegram;
+using Flickoo.Telegram.Interfaces;
+using Flickoo.Telegram.Services;
 using Microsoft.Extensions.Options;
 using Telegram.Bot;
 
@@ -17,6 +19,7 @@ IHost host = Host.CreateDefaultBuilder(args)
                 return new TelegramBotClient(options, httpClient);
             });
         services.AddHostedService<TelegramBotService>();
+        services.AddSingleton<IUserService, UserService>();
     })
     .Build();
 

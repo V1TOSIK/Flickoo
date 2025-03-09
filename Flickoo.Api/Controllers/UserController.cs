@@ -20,7 +20,7 @@ namespace Flickoo.Api.Controllers
         public async Task<ActionResult<User>> Get([FromRoute] long id)
         {
             var findUser = await _dBContext.Users
-                .AsNoTracking()
+                .Include(u => u.Location)
                 .FirstOrDefaultAsync(u => u.Id == id);
 
             if (findUser == null)
@@ -58,8 +58,9 @@ namespace Flickoo.Api.Controllers
 
         // POST api/<UserController>
         [HttpPost]
-        public async Task<ActionResult> Post([FromBody] CreateUserRequest request)
+        public async Task<ActionResult> Post([FromBody] CreateOrUpdateUserRequest request)
         {
+            long locationId = 0;
             var locationExists = await _dBContext.Locations
                 .FirstOrDefaultAsync(l => l.Name == request.LocationName);
 
@@ -71,6 +72,11 @@ namespace Flickoo.Api.Controllers
                 };
                 await _dBContext.Locations.AddAsync(newLocation);
                 await _dBContext.SaveChangesAsync();
+                locationId = newLocation.Id;
+            }
+            else
+            {
+                locationId = locationExists.Id;
             }
 
             if (string.IsNullOrEmpty(request.Username))
@@ -83,35 +89,38 @@ namespace Flickoo.Api.Controllers
             {
                 Id = request.Id,
                 Username = request.Username,
-                LocationId = locationId
+                LocationId = locationId,
             };
 
             await _dBContext.Users.AddAsync(newUser);
 
             await _dBContext.SaveChangesAsync();
 
-            return Ok($"OK, user with name: {newUser.Username} and id: {newUser.Id}");
+            return Ok($"OK, user with name: {newUser.Username} and id: {newUser.Id} was added");
         }
 
         // PUT api/<UserController>/5
         [HttpPut("{id}")]
-        public async Task<ActionResult> Put(long id, string? userName)
+        public async Task<ActionResult> Put([FromBody] CreateOrUpdateUserRequest updateUser)
         {
-            var userExists = await _dBContext.Users.FirstOrDefaultAsync(u => u.Id == id);
+            var userExists = await _dBContext.Users.FirstOrDefaultAsync(u => u.Id == updateUser.Id);
             if (userExists == null)
                 return NotFound("User not found");
 
-            if (string.IsNullOrEmpty(userName))
-                return BadRequest("no update data");
+            if (string.IsNullOrEmpty(updateUser.Username))
+            {
+                updateUser.Username = userExists.Username;
+            }
 
-            if (string.IsNullOrEmpty(userName))
-                userName = userExists.Username;
+            if (string.IsNullOrEmpty(updateUser.LocationName))
+                updateUser.LocationName = userExists.Location.Name;
 
 
                 await _dBContext.Users
-                .Where(u => u.Id == id)
+                .Where(u => u.Id == updateUser.Id)
                 .ExecuteUpdateAsync(u => u
-                    .SetProperty(u => u.Username, userName)
+                    .SetProperty(u => u.Username, updateUser.Username)
+                    .SetProperty(u => u.Location.Name, updateUser.LocationName)
                     );
 
           
@@ -124,7 +133,7 @@ namespace Flickoo.Api.Controllers
         {
             var findUser = await _dBContext.Users.AnyAsync(u => u.Id == id);
             if (!findUser)
-                return NotFound();
+                return NotFound("User not found");
  
             await _dBContext.Users
                 .Where(u => u.Id == id)
