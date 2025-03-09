@@ -3,7 +3,9 @@
     public enum UserSessionState
     {
         Idle,
-        WaitingForUserName,
-        WaitingForLocation
+        CreateWaitingForUserName,
+        CreateWaitingForLocation,
+        UpdateWaitingForUserName,
+        UpdateWaitingForLocation,
     }
 }

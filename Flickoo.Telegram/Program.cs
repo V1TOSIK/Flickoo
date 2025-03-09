@@ -1,5 +1,6 @@
 using Flickoo.Telegram;
 using Flickoo.Telegram.Interfaces;
+using Flickoo.Telegram.Keyboards;
 using Flickoo.Telegram.Services;
 using Microsoft.Extensions.Options;
 using Telegram.Bot;
@@ -20,6 +21,7 @@ IHost host = Host.CreateDefaultBuilder(args)
             });
         services.AddHostedService<TelegramBotService>();
         services.AddSingleton<IUserService, UserService>();
+        services.AddTransient<MainKeyboard>();
     })
     .Build();
 

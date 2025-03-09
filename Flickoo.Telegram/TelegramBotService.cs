@@ -1,6 +1,7 @@
 ﻿using System.Net.Http.Json;
 using Flickoo.Telegram.enums;
 using Flickoo.Telegram.Interfaces;
+using Flickoo.Telegram.Keyboards;
 using Flickoo.Telegram.SessionModels;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
@@ -17,18 +18,21 @@ namespace Flickoo.Telegram
         private readonly HttpClient _httpClient;
         private readonly ILogger<TelegramBotService> _logger;
         private readonly IUserService _userService;
+        private readonly MainKeyboard _mainKeyboard;
         private readonly Dictionary<long, UserSession> _userSessions = new();
 
         public TelegramBotService(
             ITelegramBotClient botClient,
             HttpClient httpClient,
             ILogger<TelegramBotService> logger,
-            IUserService userService)
+            IUserService userService,
+            MainKeyboard mainKeyboard)
         {
-            _userService = userService;
             _botClient = botClient;
             _httpClient = httpClient;
             _logger = logger;
+            _userService = userService;
+            _mainKeyboard = mainKeyboard;
         }
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -77,25 +81,47 @@ namespace Flickoo.Telegram
             {
                 switch (_userSessions[chatId].State)
                 {
-                    case UserSessionState.WaitingForUserName:
+                    case UserSessionState.CreateWaitingForUserName:
                         if(msg.Text == "/exit")
                         {
                             _userSessions[chatId].State = UserSessionState.Idle;
-                            await SendMainKeyboard(botClient, chatId, "Реєстрацію скасовано");
+                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Реєстрацію скасовано");
                             return;
                         }
                         _userSessions[chatId].UserName = msg.Text;
                         _userSessions[chatId].State = await _userService.CreateAccount(botClient, chatId, _userSessions[chatId].UserName, _userSessions[chatId].LocationName, cancellationToken);
                         break;
-                    case UserSessionState.WaitingForLocation:
+                    
+                    case UserSessionState.CreateWaitingForLocation:
                         if (msg.Text == "/exit")
                         {
                             _userSessions[chatId].State = UserSessionState.Idle;
-                            await SendMainKeyboard(botClient, chatId, "Реєстрацію скасовано");
+                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Реєстрацію скасовано");
                             return;
                         }
                         _userSessions[chatId].LocationName = msg.Text;
                         _userSessions[chatId].State = await _userService.CreateAccount(botClient, chatId, _userSessions[chatId].UserName, _userSessions[chatId].LocationName, cancellationToken);
+                        break;
+                    
+                    case UserSessionState.UpdateWaitingForUserName:
+                        if(msg.Text == "/exit")
+                        {
+                            _userSessions[chatId].State = UserSessionState.Idle;
+                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Оновлення скасовано");
+                            return;
+                        }
+                        _userSessions[chatId].UserName = msg.Text;
+                        _userSessions[chatId].State = await _userService.UpdateAccount(botClient, chatId, _userSessions[chatId].UserName, _userSessions[chatId].LocationName, cancellationToken);
+                        break;
+                    case UserSessionState.UpdateWaitingForLocation:
+                        if (msg.Text == "/exit")
+                        {
+                            _userSessions[chatId].State = UserSessionState.Idle;
+                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Оновлення скасовано");
+                            return;
+                        }
+                        _userSessions[chatId].LocationName = msg.Text;
+                        _userSessions[chatId].State = await _userService.UpdateAccount(botClient, chatId, _userSessions[chatId].UserName, _userSessions[chatId].LocationName, cancellationToken);
                         break;
                 }
             }
@@ -118,7 +144,7 @@ namespace Flickoo.Telegram
             {
                 case "/start":
                     await botClient.SendMessage(chatId, "Привіт! Я Telegram-бот на C#.", cancellationToken: cancellationToken);
-                    await SendMainKeyboard(botClient, chatId, "Вибери потрібну команду на панелі");
+                    await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Вибери потрібну команду на панелі");
                     break;
 
                 case "/myprofile":
@@ -132,43 +158,30 @@ namespace Flickoo.Telegram
                         session.LocationName,
                         cancellationToken);
                     break;
-
+    
+                case "/updateaccount":
+                    _userSessions[chatId].State = await _userService.UpdateAccount(botClient,
+                        chatId,
+                        session.UserName,
+                        session.LocationName,
+                        cancellationToken);
+                    break;
+                
                 case "/exit":
-                    await SendMainKeyboard(botClient, chatId, "Дію скасовано");
+                    await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Дію скасовано");
                     _userSessions[chatId].State = UserSessionState.Idle;
                     _userSessions[chatId].UserName = string.Empty;
                     _userSessions[chatId].LocationName = string.Empty;
                     break;
 
                 default:
-                    await SendMainKeyboard(botClient, chatId, "невідома команда");
+                    await _mainKeyboard.SendMainKeyboard(botClient, chatId, "невідома команда");
                     break;
             }
 
         }
 
-        private async Task SendMainKeyboard(ITelegramBotClient botClient, long chatId, string text)
-        {
-            if (chatId == 0)
-            {
-                _logger.LogError("Не вдалося отримати chatId");
-                return;
-            }
-
-            var keyboard = new ReplyKeyboardMarkup(new[]
-            {
-                    new KeyboardButton("/myprofile"),
-                    new KeyboardButton("/myproducts"),
-                    new KeyboardButton("/mylikes"),
-                    new KeyboardButton("/categories")
-
-            })
-            {
-                ResizeKeyboard = true,
-                OneTimeKeyboard = false
-            };
-            await botClient.SendMessage(chatId, text, replyMarkup: keyboard);
-        }
+        
 
         
         private async Task AddProduct(ITelegramBotClient botClient, Message msg)
