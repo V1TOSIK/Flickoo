@@ -67,8 +67,8 @@ namespace Flickoo.Telegram.Services
         {
             var profileKeyboard = new ReplyKeyboardMarkup(new[]
             {
-                new KeyboardButton("/updateaccount"),
-                new KeyboardButton("/exit")
+                new KeyboardButton("оновити дані"),
+                new KeyboardButton("вихід")
             })
             {
                 ResizeKeyboard = true,
@@ -84,8 +84,8 @@ namespace Flickoo.Telegram.Services
         {
             var registrationKeyboard = new ReplyKeyboardMarkup(new[]
             {
-                    new KeyboardButton("/createaccount"),
-                    new KeyboardButton("/exit")
+                    new KeyboardButton("створити акаунт"),
+                    new KeyboardButton("вихід")
             })
             {
                 ResizeKeyboard = true,
@@ -139,6 +139,8 @@ namespace Flickoo.Telegram.Services
             }
             return UserSessionState.Idle;
         }
+
+
 
         public async Task<UserSessionState> UpdateAccount(ITelegramBotClient botClient,
             long chatId,

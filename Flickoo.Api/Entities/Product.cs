@@ -13,10 +13,10 @@
         public DateTime CreatedAt { get; set; }
 
         public long UserId { get; set; }
-        public User User { get; set; }
+        public User? User { get; set; }
 
         public long CategoryId { get; set; }
-        public Category Category { get; set; }
+        public Category? Category { get; set; }
 
         public List<MediaFile> ProductMedias { get; set; } = new List<MediaFile>();
 

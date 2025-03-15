@@ -16,10 +16,10 @@ public class MainKeyboard(ILogger<TelegramBotService> logger)
 
         var keyboard = new ReplyKeyboardMarkup(new[]
         {
-            new KeyboardButton("/myprofile"),
-            new KeyboardButton("/myproducts"),
-            new KeyboardButton("/mylikes"),
-            new KeyboardButton("/categories")
+            new KeyboardButton("мій профіль"),
+            new KeyboardButton("мої оголошення"),
+            new KeyboardButton("мої лайки"),
+            new KeyboardButton("категорії")
 
         })
         {

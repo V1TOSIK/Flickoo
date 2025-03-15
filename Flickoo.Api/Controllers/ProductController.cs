@@ -31,21 +31,36 @@ namespace Flickoo.Api.Controllers
 
         // GET api/<ProductController>/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<User?>> Get(long id)
+        public async Task<ActionResult<ICollection<Product>>> GetByUserId([FromRoute]long id)
         {
-            var findProduct = await _dbContext.Products
-                .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.Id == id);
+            if (id == 0)
+                return BadRequest();
 
-            if (findProduct == null)
+            if (!await _dbContext.Users.AnyAsync(u => u.Id == id))
                 return NotFound();
 
-            return Ok(findProduct);
+            var userProducts = await _dbContext.Products
+                .AsNoTracking()
+                .Where(p => p.UserId == id)
+                .OrderBy(p => p.CreatedAt)
+                .ToListAsync();
+
+
+            return Ok(userProducts);
+        }
+
+        [HttpGet("category")]
+        public async Task<ActionResult<ICollection<Category>>> GetCategories()
+        {
+            var categories = await _dbContext.Categories
+                .AsNoTracking()
+                .ToListAsync();
+            return Ok(categories);
         }
 
         // POST api/<ProductController>
         [HttpPost]
-        public async Task<ActionResult> Post(CreateProductRequest product)
+        public async Task<ActionResult> Post([FromBody] CreateProductRequest product)
         {
             var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == product.UserId);
             var category = await _dbContext.Categories.FirstOrDefaultAsync(c => c.Id == product.CategoryId);
@@ -68,21 +83,9 @@ namespace Flickoo.Api.Controllers
             return Ok();
         }
 
-        [HttpPost("category")]
-        public async Task<ActionResult> AddNewCategory(string name)
-        {
-            var newCategory = new Category
-            {
-                Name = name
-            };
-            await _dbContext.Categories.AddAsync(newCategory);
-            await _dbContext.SaveChangesAsync();
-            return Ok($"Added new category: {newCategory.Name}, Id: {newCategory.Id}");
-        }
-
         // PUT api/<ProductController>/5
         [HttpPut("{id}")]
-        public async Task<ActionResult> Put(long id,
+        public async Task<ActionResult> Put([FromRoute] long id,
             string name,
             decimal price,
             string description,
@@ -104,7 +107,7 @@ namespace Flickoo.Api.Controllers
 
         // DELETE api/<ProductController>/5
         [HttpDelete("{id}")]
-        public async Task<ActionResult> Delete(long id)
+        public async Task<ActionResult> Delete([FromRoute] long id)
         {
             var productExists = await _dbContext.Products.AnyAsync(p => p.Id == id);
             if (!productExists)

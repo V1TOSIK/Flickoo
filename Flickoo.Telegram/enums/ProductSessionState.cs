@@ -3,6 +3,7 @@
     public enum ProductSessionState
     {
         Idle,
+        WaitingForCategory,
         WaitingForProductName,
         WaitingForPrice,
         WaitingForDescription,

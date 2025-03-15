@@ -60,7 +60,7 @@ namespace Flickoo.Api.Controllers
         [HttpPost]
         public async Task<ActionResult> Post([FromBody] CreateOrUpdateUserRequest request)
         {
-            long locationId = 0;
+            long locationId;
             var locationExists = await _dBContext.Locations
                 .FirstOrDefaultAsync(l => l.Name == request.LocationName);
 

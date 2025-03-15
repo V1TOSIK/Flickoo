@@ -7,8 +7,6 @@ using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
-using Telegram.Bot.Types.Enums;
-using Telegram.Bot.Types.ReplyMarkups;
 
 namespace Flickoo.Telegram
 {
@@ -18,21 +16,28 @@ namespace Flickoo.Telegram
         private readonly HttpClient _httpClient;
         private readonly ILogger<TelegramBotService> _logger;
         private readonly IUserService _userService;
+        private readonly IProductService _productService;
         private readonly MainKeyboard _mainKeyboard;
+        private readonly MyProductKeyboard _myProductKeyboard;
         private readonly Dictionary<long, UserSession> _userSessions = new();
+        private readonly Dictionary<long, ProductSession> _productSessions = new();
 
         public TelegramBotService(
             ITelegramBotClient botClient,
             HttpClient httpClient,
             ILogger<TelegramBotService> logger,
             IUserService userService,
-            MainKeyboard mainKeyboard)
+            IProductService productService,
+            MainKeyboard mainKeyboard,
+            MyProductKeyboard myProductKeyboard)
         {
             _botClient = botClient;
             _httpClient = httpClient;
             _logger = logger;
             _userService = userService;
+            _productService = productService;
             _mainKeyboard = mainKeyboard;
+            _myProductKeyboard = myProductKeyboard;
         }
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -57,6 +62,7 @@ namespace Flickoo.Telegram
             await (update switch
             {
                 { Message: { } message } => OnMessage(botClient, message, cancellationToken),
+                { CallbackQuery: { } callbackQuery } => OnCallbackQuery(botClient, callbackQuery, cancellationToken),
                 _ => UnknownUpdateHandlerAsync(botClient, update)
             });
         }
@@ -73,71 +79,29 @@ namespace Flickoo.Telegram
             }
             _logger.LogInformation($"Отримано повiдомлення: {msg.Text} | ChatId: {chatId} | UserName: {userName} | Time: {DateTime.UtcNow}");
 
-            if (!_userSessions.ContainsKey(chatId))
-                _userSessions[chatId] = new UserSession();
+            if(await HandleBaseCommand(botClient, chatId, msg, cancellationToken))
+                return;
 
+            if (await UserSessionCheck(botClient, chatId, msg, cancellationToken))
+                return;
 
-            if (_userSessions[chatId].State != UserSessionState.Idle)
-            {
-                switch (_userSessions[chatId].State)
-                {
-                    case UserSessionState.CreateWaitingForUserName:
-                        if(msg.Text == "/exit")
-                        {
-                            _userSessions[chatId].State = UserSessionState.Idle;
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Реєстрацію скасовано");
-                            return;
-                        }
-                        _userSessions[chatId].UserName = msg.Text;
-                        _userSessions[chatId].State = await _userService.CreateAccount(botClient, chatId, _userSessions[chatId].UserName, _userSessions[chatId].LocationName, cancellationToken);
-                        break;
-                    
-                    case UserSessionState.CreateWaitingForLocation:
-                        if (msg.Text == "/exit")
-                        {
-                            _userSessions[chatId].State = UserSessionState.Idle;
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Реєстрацію скасовано");
-                            return;
-                        }
-                        _userSessions[chatId].LocationName = msg.Text;
-                        _userSessions[chatId].State = await _userService.CreateAccount(botClient, chatId, _userSessions[chatId].UserName, _userSessions[chatId].LocationName, cancellationToken);
-                        break;
-                    
-                    case UserSessionState.UpdateWaitingForUserName:
-                        if(msg.Text == "/exit")
-                        {
-                            _userSessions[chatId].State = UserSessionState.Idle;
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Оновлення скасовано");
-                            return;
-                        }
-                        _userSessions[chatId].UserName = msg.Text;
-                        _userSessions[chatId].State = await _userService.UpdateAccount(botClient, chatId, _userSessions[chatId].UserName, _userSessions[chatId].LocationName, cancellationToken);
-                        break;
-                    case UserSessionState.UpdateWaitingForLocation:
-                        if (msg.Text == "/exit")
-                        {
-                            _userSessions[chatId].State = UserSessionState.Idle;
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Оновлення скасовано");
-                            return;
-                        }
-                        _userSessions[chatId].LocationName = msg.Text;
-                        _userSessions[chatId].State = await _userService.UpdateAccount(botClient, chatId, _userSessions[chatId].UserName, _userSessions[chatId].LocationName, cancellationToken);
-                        break;
-                }
-            }
-            else
-                await HandleCommand(botClient, msg, chatId, _userSessions[chatId], cancellationToken);
+            if(await ProductSessionCheck(botClient, chatId, msg, cancellationToken))
+                return;
+
+            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Вибери потрібну команду на панелі");
+
 
         }
-        
-
-        private async Task HandleCommand(ITelegramBotClient botClient, Message command, long chatId, UserSession session, CancellationToken cancellationToken)
+        private async Task<bool> HandleBaseCommand(ITelegramBotClient botClient,
+            long chatId,
+            Message command,
+            CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(command.Text))
             {
                 _logger.LogWarning("Пуста команда.");
                 await botClient.SendMessage(chatId, "Пуста команда.", cancellationToken: cancellationToken);
-                return;
+                return false;
             }
 
             switch (command.Text.ToLower())
@@ -147,72 +111,283 @@ namespace Flickoo.Telegram
                     await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Вибери потрібну команду на панелі");
                     break;
 
-                case "/myprofile":
-                    await _userService.MyProfile(botClient, chatId, cancellationToken);
-                    break;
-
-                case "/createaccount":
-                    _userSessions[chatId].State = await _userService.CreateAccount(botClient,
-                        chatId,
-                        session.UserName,
-                        session.LocationName,
-                        cancellationToken);
-                    break;
-    
-                case "/updateaccount":
-                    _userSessions[chatId].State = await _userService.UpdateAccount(botClient,
-                        chatId,
-                        session.UserName,
-                        session.LocationName,
-                        cancellationToken);
-                    break;
-                
-                case "/exit":
+                case "вихід":
                     await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Дію скасовано");
-                    _userSessions[chatId].State = UserSessionState.Idle;
-                    _userSessions[chatId].UserName = string.Empty;
-                    _userSessions[chatId].LocationName = string.Empty;
+                    _userSessions.Remove(chatId);
+                    _productSessions.Remove(chatId);
                     break;
 
                 default:
-                    await _mainKeyboard.SendMainKeyboard(botClient, chatId, "невідома команда");
-                    break;
+                    return false;
             }
+            return true;
+        }
+        private async Task<bool> UserSessionCheck(ITelegramBotClient botClient, long chatId, Message msg, CancellationToken cancellationToken)
+        {
+            if (!_userSessions.ContainsKey(chatId))
+                _userSessions[chatId] = new UserSession();
+
+            if (_userSessions[chatId].State != UserSessionState.Idle)
+            {
+                switch (_userSessions[chatId].State)
+                {
+                    case UserSessionState.CreateWaitingForUserName:
+                        if (msg.Text == "вихід")
+                        {
+                            _userSessions[chatId].State = UserSessionState.Idle;
+                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Реєстрацію скасовано");
+                            return true;
+                        }
+                        _userSessions[chatId].UserName = msg.Text ?? "";
+                        _userSessions[chatId].State = await _userService.CreateAccount(botClient, chatId, _userSessions[chatId].UserName, _userSessions[chatId].LocationName, cancellationToken);
+                        break;
+
+                    case UserSessionState.CreateWaitingForLocation:
+                        if (msg.Text == "вихід")
+                        {
+                            _userSessions[chatId].State = UserSessionState.Idle;
+                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Реєстрацію скасовано");
+                            return true;
+                        }
+                        _userSessions[chatId].LocationName = msg.Text ?? "";
+                        _userSessions[chatId].State = await _userService.CreateAccount(botClient, chatId, _userSessions[chatId].UserName, _userSessions[chatId].LocationName, cancellationToken);
+                        break;
+
+                    case UserSessionState.UpdateWaitingForUserName:
+                        if (msg.Text == "вихід")
+                        {
+                            _userSessions[chatId].State = UserSessionState.Idle;
+                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Оновлення скасовано");
+                            return true;
+                        }
+                        _userSessions[chatId].UserName = msg.Text ?? "";
+                        _userSessions[chatId].State = await _userService.UpdateAccount(botClient, chatId, _userSessions[chatId].UserName, _userSessions[chatId].LocationName, cancellationToken);
+                        break;
+                    case UserSessionState.UpdateWaitingForLocation:
+                        if (msg.Text == "вихід")
+                        {
+                            _userSessions[chatId].State = UserSessionState.Idle;
+                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Оновлення скасовано");
+                            return true;
+                        }
+                        _userSessions[chatId].LocationName = msg.Text ?? "";
+                        _userSessions[chatId].State = await _userService.UpdateAccount(botClient, chatId, _userSessions[chatId].UserName, _userSessions[chatId].LocationName, cancellationToken);
+                        break;
+                }
+            }
+            else
+            {
+                if(await HandleUserCommand(botClient, msg, chatId, _userSessions[chatId], cancellationToken))
+                    return true;
+            }
+            return false;
+        }
+
+        private async Task<bool> HandleUserCommand(ITelegramBotClient botClient,
+            Message command,
+            long chatId,
+            UserSession userSession,
+            CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrEmpty(command.Text))
+            {
+                _logger.LogWarning("Пуста команда.");
+                await botClient.SendMessage(chatId, "Пуста команда.", cancellationToken: cancellationToken);
+                return false;
+            }
+
+            switch (command.Text.ToLower())
+            {
+                case "мій профіль":
+                    await _userService.MyProfile(botClient, chatId, cancellationToken);
+                    break;
+
+                case "створити акаунт":
+                    _userSessions[chatId].State = await _userService.CreateAccount(botClient,
+                        chatId,
+                        userSession.UserName ?? "",
+                        userSession.LocationName,
+                        cancellationToken);
+                    break;
+    
+                case "оновити дані":
+                    _userSessions[chatId].State = await _userService.UpdateAccount(botClient,
+                        chatId,
+                        userSession.UserName,
+                        userSession.LocationName,
+                        cancellationToken);
+                    if (_userSessions[chatId].State == UserSessionState.Idle)
+                        _userSessions.Remove(chatId);
+                    break;
+
+                default:
+                    return false;
+            }
+            return true;
 
         }
 
-        
-
-        
-        private async Task AddProduct(ITelegramBotClient botClient, Message msg)
+        private async Task<bool> ProductSessionCheck(ITelegramBotClient botClient, long chatId, Message msg, CancellationToken cancellationToken)
         {
-            if (msg.Text?.ToLower() == "/add product")
+            if (!_productSessions.ContainsKey(chatId))
+                _productSessions[chatId] = new ProductSession();
+
+            if (_productSessions[chatId].State != ProductSessionState.Idle)
             {
-                var category = 1; // замініть на реальний ID категорії
-                                  // Відправка POST-запиту для додавання продукту
-                var product = new
+                switch (_productSessions[chatId].State)
                 {
-                    Name = "Motorcycle",
-                    Price = 15000.0m,
-                    Description = "A great motorcycle",
-                    UserId = msg.Chat.Id,
-                    CategoryId = category
-                };
+                    case ProductSessionState.WaitingForCategory:
+                        if (msg.Text == "вихід")
+                        {
+                            _productSessions[chatId].State = ProductSessionState.Idle;
+                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Додавання продукту скасовано");
+                            return true;
+                        }
+                        _productSessions[chatId].State = await _productService.AddProduct(botClient,
+                            chatId,
+                            _productSessions[chatId].CategoryId,
+                            _productSessions[chatId].MediaUrl,
+                            _productSessions[chatId].ProductName,
+                            _productSessions[chatId].Price,
+                            _productSessions[chatId].ProductDescription,
+                            cancellationToken);
+                        break;
 
-                var response = await _httpClient.PostAsJsonAsync("https://localhost:8443/api/Product", product);
+                    case ProductSessionState.WaitingForProductName:
+                        if (msg.Text == "вихід")
+                        {
+                            _productSessions[chatId].State = ProductSessionState.Idle;
+                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Додавання продукту скасовано");
+                            return true;
+                        }
+                        _productSessions[chatId].State = await _productService.AddProduct(botClient,
+                            chatId,
+                            _productSessions[chatId].CategoryId,
+                            _productSessions[chatId].MediaUrl,
+                            _productSessions[chatId].ProductName,
+                            _productSessions[chatId].Price,
+                            _productSessions[chatId].ProductDescription,
+                            cancellationToken);
+                        break;
 
-                if (response.IsSuccessStatusCode)
-                {
-                    await botClient.SendMessage(msg.Chat.Id, "Продукт успішно додано!");
-                    _logger.LogInformation("Продукт успішно додано!");
-                }
-                else
-                {
-                    var errorDetails = await response.Content.ReadAsStringAsync();
-                    _logger.LogError("{ErrorDetails}", errorDetails);
-                    await botClient.SendMessage(msg.Chat.Id, "Помилка при додаванні продукту.");
+                    case ProductSessionState.WaitingForPrice:
+                        if (msg.Text == "вихід")
+                        {
+                            _productSessions[chatId].State = ProductSessionState.Idle;
+                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Додавання продукту скасовано");
+                            return true;
+                        }
+                        _productSessions[chatId].ProductName = msg.Text ?? "";
+                        _productSessions[chatId].State = await _productService.AddProduct(botClient,
+                            chatId,
+                            _productSessions[chatId].CategoryId,
+                            _productSessions[chatId].MediaUrl,
+                            _productSessions[chatId].ProductName,
+                            _productSessions[chatId].Price,
+                            _productSessions[chatId].ProductDescription,
+                            cancellationToken);
+                        break;
+
+                    case ProductSessionState.WaitingForDescription:
+                        if (msg.Text == "вихід")
+                        {
+                            _productSessions[chatId].State = ProductSessionState.Idle;
+                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Додавання продукту скасовано");
+                            return true;
+                        }
+                        if (!decimal.TryParse(msg.Text, out var price))
+                        {
+                            await botClient.SendMessage(chatId, "Ціна повинна бути числом", cancellationToken: cancellationToken);
+                            return true;
+                        }
+                        _productSessions[chatId].State = await _productService.AddProduct(botClient,
+                            chatId,
+                            _productSessions[chatId].CategoryId,
+                            _productSessions[chatId].MediaUrl,
+                            _productSessions[chatId].ProductName,
+                            _productSessions[chatId].Price,
+                            _productSessions[chatId].ProductDescription,
+                            cancellationToken);
+                        break;
                 }
             }
+            else
+            {
+                if (await HandleProductCommand(botClient, msg, chatId, _productSessions[chatId], cancellationToken))
+                    return true;
+            }
+
+            return false;
+
+        }
+
+        private async Task<bool> HandleProductCommand(ITelegramBotClient botClient,
+            Message command,
+            long chatId,
+            ProductSession productSession,
+            CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrEmpty(command.Text))
+            {
+                _logger.LogWarning("Пуста команда.");
+                await botClient.SendMessage(chatId, "Пуста команда.", cancellationToken: cancellationToken);
+                return false;
+            }
+
+            switch (command.Text.ToLower())
+            {
+                case "мої оголошення":
+                    await _productService.GetProducts(botClient, chatId, cancellationToken);
+                    await _myProductKeyboard.SendMyProductKeyboard(botClient, chatId, cancellationToken);
+                    break;
+                case "додати продукт":
+                    await _productService.AddProduct(botClient,
+                        chatId,
+                        _productSessions[chatId].CategoryId,
+                        _productSessions[chatId].MediaUrl,
+                        _productSessions[chatId].ProductName,
+                        _productSessions[chatId].Price,
+                        _productSessions[chatId].ProductDescription,
+                        cancellationToken);
+                    break;
+
+                default:
+                    return false;
+            }
+            return true;
+        }
+
+        private async Task OnCallbackQuery(ITelegramBotClient botClient, CallbackQuery callbackQuery, CancellationToken cancellationToken)
+        {
+            if (callbackQuery.Message == null)
+            {
+                _logger.LogWarning("CallbackQuery.Message не може бути пустим.");
+                await botClient.SendMessage(callbackQuery.Message.Chat.Id, "CallbackQuery.Message не може бути пустим.", cancellationToken: cancellationToken);
+                return;
+            }
+
+            var chatId = callbackQuery.Message.Chat.Id;
+            var userName = callbackQuery.From.Username ?? "Unknown";
+            _logger.LogInformation($"Отримано callbackQuery: {callbackQuery.Data} | ChatId: {chatId} | UserName: {userName} | Time: {DateTime.UtcNow}");
+            if (string.IsNullOrEmpty(callbackQuery.Data))
+            {
+                _logger.LogWarning("CallbackQuery не може бути пустим.");
+                await botClient.SendMessage(chatId, "CallbackQuery не може бути пустим.", cancellationToken: cancellationToken);
+                return;
+            }
+            else
+            {
+                _productSessions[chatId].CategoryId = int.Parse(callbackQuery.Data);
+                await _productService.AddProduct(botClient,
+                    chatId,
+                    _productSessions[chatId].CategoryId,
+                    _productSessions[chatId].MediaUrl,
+                    _productSessions[chatId].ProductName,
+                    _productSessions[chatId].Price,
+                    _productSessions[chatId].ProductDescription,
+                    cancellationToken);
+            }
+            return;
         }
 
         private async Task UnknownUpdateHandlerAsync(ITelegramBotClient botClient, Update update)
