@@ -17,6 +17,7 @@ namespace Flickoo.Telegram
         private readonly ILogger<TelegramBotService> _logger;
         private readonly IUserService _userService;
         private readonly IProductService _productService;
+        private readonly IMediaService _mediaService;
         private readonly MainKeyboard _mainKeyboard;
         private readonly MyProductKeyboard _myProductKeyboard;
         private readonly Dictionary<long, UserSession> _userSessions = new();
@@ -28,6 +29,7 @@ namespace Flickoo.Telegram
             ILogger<TelegramBotService> logger,
             IUserService userService,
             IProductService productService,
+            IMediaService mediaService,
             MainKeyboard mainKeyboard,
             MyProductKeyboard myProductKeyboard)
         {
@@ -36,6 +38,7 @@ namespace Flickoo.Telegram
             _logger = logger;
             _userService = userService;
             _productService = productService;
+            _mediaService = mediaService;
             _mainKeyboard = mainKeyboard;
             _myProductKeyboard = myProductKeyboard;
         }
@@ -71,7 +74,7 @@ namespace Flickoo.Telegram
         {
             var chatId = msg.Chat.Id;
             var userName = msg.From?.Username ?? "Unknown";
-            if (string.IsNullOrEmpty(msg.Text))
+            if (string.IsNullOrEmpty(msg.Text) && msg.MediaGroupId == null)
             {
                 _logger.LogWarning("Повідомлення не може бути пустим.");
                 await botClient.SendMessage(chatId, "Повідомлення не може бути пустим.", cancellationToken: cancellationToken);
@@ -92,6 +95,7 @@ namespace Flickoo.Telegram
 
 
         }
+
         private async Task<bool> HandleBaseCommand(ITelegramBotClient botClient,
             long chatId,
             Message command,
@@ -243,14 +247,29 @@ namespace Flickoo.Telegram
                             await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Додавання продукту скасовано");
                             return true;
                         }
-                        _productSessions[chatId].State = await _productService.AddProduct(botClient,
-                            chatId,
-                            _productSessions[chatId].CategoryId,
-                            _productSessions[chatId].MediaUrl,
-                            _productSessions[chatId].ProductName,
-                            _productSessions[chatId].Price,
-                            _productSessions[chatId].ProductDescription,
-                            cancellationToken);
+                        break;
+
+                    case ProductSessionState.WaitingForMedia:
+                        if (msg.Text == "вихід")
+                        {
+                            _productSessions[chatId].State = ProductSessionState.Idle;
+                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Додавання продукту скасовано");
+                            return true;
+                        }
+                        if (msg.Photo != null && msg.Photo.Length > 0 && msg.Photo.Length < 6)
+                        {
+                            _productSessions[chatId].MediaUrls = await SavePhoto(botClient, msg, chatId, cancellationToken);
+
+                            _productSessions[chatId].State = await _productService.AddProduct(botClient,
+                                chatId,
+                                _productSessions[chatId].CategoryId,
+                                _productSessions[chatId].MediaUrls,
+                                _productSessions[chatId].ProductName,
+                                _productSessions[chatId].Price,
+                                _productSessions[chatId].ProductDescription,
+                                cancellationToken);
+                        }
+
                         break;
 
                     case ProductSessionState.WaitingForProductName:
@@ -263,7 +282,7 @@ namespace Flickoo.Telegram
                         _productSessions[chatId].State = await _productService.AddProduct(botClient,
                             chatId,
                             _productSessions[chatId].CategoryId,
-                            _productSessions[chatId].MediaUrl,
+                            _productSessions[chatId].MediaUrls,
                             _productSessions[chatId].ProductName,
                             _productSessions[chatId].Price,
                             _productSessions[chatId].ProductDescription,
@@ -281,7 +300,7 @@ namespace Flickoo.Telegram
                         _productSessions[chatId].State = await _productService.AddProduct(botClient,
                             chatId,
                             _productSessions[chatId].CategoryId,
-                            _productSessions[chatId].MediaUrl,
+                            _productSessions[chatId].MediaUrls,
                             _productSessions[chatId].ProductName,
                             _productSessions[chatId].Price,
                             _productSessions[chatId].ProductDescription,
@@ -303,7 +322,7 @@ namespace Flickoo.Telegram
                         _productSessions[chatId].State = await _productService.AddProduct(botClient,
                             chatId,
                             _productSessions[chatId].CategoryId,
-                            _productSessions[chatId].MediaUrl,
+                            _productSessions[chatId].MediaUrls,
                             _productSessions[chatId].ProductName,
                             _productSessions[chatId].Price,
                             _productSessions[chatId].ProductDescription,
@@ -319,6 +338,58 @@ namespace Flickoo.Telegram
 
             return false;
 
+        }
+
+        private async Task<List<string?>> SavePhoto(ITelegramBotClient botClient, Message msg, long chatId, CancellationToken cancellationToken)
+        {
+
+            if (msg.Photo == null || msg.Photo.Length == 0)
+            {
+                _logger.LogWarning("Повідомлення не містить фото.");
+                return [];
+            }
+
+            if (msg.Photo.Length > 5)
+            {
+                _logger.LogWarning("Не можна зберігати більше 4 фото.");
+                return [];
+            }
+
+            var mediaUrls = new List<string?>();
+
+            foreach (var photoSize in msg.Photo)
+            {
+                try
+                {
+                    var file = await botClient.GetFile(photoSize.FileId, cancellationToken);
+                    var filePath = file.FilePath;
+
+                    if (string.IsNullOrEmpty(filePath))
+                    {
+                        _logger.LogWarning("Не вдалося отримати шлях до файлу {FileId}", photoSize.FileId);
+                        continue;
+                    }
+
+                    await using var fileStream = new MemoryStream();
+                    await botClient.DownloadFile(filePath, fileStream, cancellationToken);
+                    fileStream.Seek(0, SeekOrigin.Begin);
+
+                    var isSaved = await _mediaService.SaveProductMediaFile(fileStream, $"{photoSize.FileId}.jpg", chatId);
+                    if (!isSaved)
+                    {
+                        _logger.LogError("Не вдалося зберегти файл {FileId}", photoSize.FileId);
+                    }
+                    else
+                    {
+                        mediaUrls.Add(_mediaService.GetProductMediaFilePath(chatId, $"{photoSize.FileId}.jpg"));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Помилка при збереженні фото {FileId}", photoSize.FileId);
+                }
+            }
+            return mediaUrls;
         }
 
         private async Task<bool> HandleProductCommand(ITelegramBotClient botClient,
@@ -341,10 +412,10 @@ namespace Flickoo.Telegram
                     await _myProductKeyboard.SendMyProductKeyboard(botClient, chatId, cancellationToken);
                     break;
                 case "додати продукт":
-                    await _productService.AddProduct(botClient,
+                    _productSessions[chatId].State = await _productService.AddProduct(botClient,
                         chatId,
                         _productSessions[chatId].CategoryId,
-                        _productSessions[chatId].MediaUrl,
+                        _productSessions[chatId].MediaUrls,
                         _productSessions[chatId].ProductName,
                         _productSessions[chatId].Price,
                         _productSessions[chatId].ProductDescription,
@@ -362,7 +433,6 @@ namespace Flickoo.Telegram
             if (callbackQuery.Message == null)
             {
                 _logger.LogWarning("CallbackQuery.Message не може бути пустим.");
-                await botClient.SendMessage(callbackQuery.Message.Chat.Id, "CallbackQuery.Message не може бути пустим.", cancellationToken: cancellationToken);
                 return;
             }
 
@@ -377,15 +447,24 @@ namespace Flickoo.Telegram
             }
             else
             {
-                _productSessions[chatId].CategoryId = int.Parse(callbackQuery.Data);
-                await _productService.AddProduct(botClient,
-                    chatId,
-                    _productSessions[chatId].CategoryId,
-                    _productSessions[chatId].MediaUrl,
-                    _productSessions[chatId].ProductName,
-                    _productSessions[chatId].Price,
-                    _productSessions[chatId].ProductDescription,
-                    cancellationToken);
+                switch (_productSessions[chatId].State)
+                {
+                    case ProductSessionState.WaitingForCategory:
+                        _productSessions[chatId].CategoryId = int.Parse(callbackQuery.Data);
+                        _productSessions[chatId].State = await _productService.AddProduct(botClient,
+                            chatId,
+                            _productSessions[chatId].CategoryId,
+                            _productSessions[chatId].MediaUrls,
+                            _productSessions[chatId].ProductName,
+                            _productSessions[chatId].Price,
+                            _productSessions[chatId].ProductDescription,
+                            cancellationToken);
+                        break;
+
+                    default:
+                        break;
+                }
+                
             }
             return;
         }

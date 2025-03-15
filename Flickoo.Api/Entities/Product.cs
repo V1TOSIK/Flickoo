@@ -18,8 +18,8 @@
         public long CategoryId { get; set; }
         public Category? Category { get; set; }
 
-        public List<MediaFile> ProductMedias { get; set; } = new List<MediaFile>();
+        public List<MediaFile> ProductMedias { get; set; } = [];
 
-        public List<Like> Likes { get; set; } = new List<Like>();
+        public List<Like> Likes { get; set; } = [];
     }
 }

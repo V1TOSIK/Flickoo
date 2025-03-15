@@ -70,6 +70,7 @@ namespace Flickoo.Api.Controllers
 
             var newProduct = new Product
             {
+                ProductMedias = product.MediaUrls.Select(url => new MediaFile { Url = url }).ToList(),
                 Name = product.Name,
                 Price = product.Price,
                 Description = product.Description,
@@ -77,6 +78,7 @@ namespace Flickoo.Api.Controllers
                 CategoryId = product.CategoryId,
                 User = user,
                 Category = category
+
             };
             await _dbContext.Products.AddAsync(newProduct);
             await _dbContext.SaveChangesAsync();

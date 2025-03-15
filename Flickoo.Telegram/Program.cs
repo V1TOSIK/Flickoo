@@ -22,6 +22,7 @@ IHost host = Host.CreateDefaultBuilder(args)
         services.AddHostedService<TelegramBotService>();
         services.AddSingleton<IUserService, UserService>();
         services.AddSingleton<IProductService, ProductService>();
+        services.AddSingleton<IMediaService, MediaService>();
         services.AddTransient<MainKeyboard>();
         services.AddTransient<AddProductCategoryInlineKeyboard>();
         services.AddTransient<MyProductKeyboard>();
