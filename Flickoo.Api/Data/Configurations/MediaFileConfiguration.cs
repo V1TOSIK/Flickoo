@@ -11,7 +11,7 @@ namespace Flickoo.Api.Data.Configurations
             builder.ToTable("MediaFiles").HasKey(mf => mf.Id);
             builder.Property(mf => mf.Id).HasColumnName("MediaId");
             builder.Property(mf => mf.Url).IsRequired();
-            builder.Property(mf => mf.TypeOfFile).IsRequired();
+            builder.Property(mf => mf.TypeOfMedia).IsRequired();
             builder.HasOne(mf => mf.Product)
                 .WithMany(p => p.ProductMedias)
                 .HasForeignKey(mf => mf.ProductId)

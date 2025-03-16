@@ -68,7 +68,7 @@ namespace Flickoo.Telegram.Services
             var profileKeyboard = new ReplyKeyboardMarkup(new[]
             {
                 new KeyboardButton("оновити дані"),
-                new KeyboardButton("вихід")
+                new KeyboardButton("назад")
             })
             {
                 ResizeKeyboard = true,
@@ -85,7 +85,7 @@ namespace Flickoo.Telegram.Services
             var registrationKeyboard = new ReplyKeyboardMarkup(new[]
             {
                     new KeyboardButton("створити акаунт"),
-                    new KeyboardButton("вихід")
+                    new KeyboardButton("назад")
             })
             {
                 ResizeKeyboard = true,

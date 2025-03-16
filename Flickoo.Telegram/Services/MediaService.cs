@@ -34,12 +34,19 @@ namespace Flickoo.Telegram.Services
 
             var filePath = Path.Combine(userDirectory, fileName);
 
-            using (var file = new FileStream(filePath, FileMode.Create, FileAccess.Write))
+            try
             {
-                await fileStream.CopyToAsync(file);
+                using (var file = new FileStream(filePath, FileMode.Create, FileAccess.Write))
+                {
+                    await fileStream.CopyToAsync(file);
+                }
+                return true;
             }
-
-            return true;
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error saving media file: {ex.Message}");
+                return false;
+            }
         }
 
         public string GetProductMediaFilePath(long userId, string fileName)

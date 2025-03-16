@@ -1,6 +1,8 @@
 ﻿using Flickoo.Api.Data;
 using Flickoo.Api.DTOs;
 using Flickoo.Api.Entities;
+using Flickoo.Api.Interfaces;
+using Flickoo.Api.Repositories;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,10 +13,20 @@ namespace Flickoo.Api.Controllers
     public class ProductController : ControllerBase
     {
         private readonly FlickooDbContext _dbContext;
+        private readonly IMediaRepository _mediaRepository;
+        private readonly IProductRepository _productRepository;
+        private readonly ILogger<ProductController> _logger;
 
-        public ProductController(FlickooDbContext dbContext)
+        public ProductController(FlickooDbContext dbContext,
+            IMediaRepository mediaRepository,
+            IProductRepository productRepository,
+            ILogger<ProductController> logger)
         {
             _dbContext = dbContext;
+            _mediaRepository = mediaRepository;
+            _productRepository = productRepository;
+            _logger = logger;
+
         }
 
         // GET: api/<ProductController>
@@ -42,7 +54,8 @@ namespace Flickoo.Api.Controllers
             var userProducts = await _dbContext.Products
                 .AsNoTracking()
                 .Where(p => p.UserId == id)
-                .OrderBy(p => p.CreatedAt)
+                .OrderBy(p => p.CreatedAt)/*
+                .Select(p => p.ProductMedias)*/
                 .ToListAsync();
 
 
@@ -62,26 +75,20 @@ namespace Flickoo.Api.Controllers
         [HttpPost]
         public async Task<ActionResult> Post([FromBody] CreateProductRequest product)
         {
-            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == product.UserId);
-            var category = await _dbContext.Categories.FirstOrDefaultAsync(c => c.Id == product.CategoryId);
+            var newProduct = await _productRepository.AddProductAsync(product);
 
-            if (user == null || category == null)
-                return NotFound("User or category is not found");
+            if (newProduct == null)
+                return BadRequest();
 
-            var newProduct = new Product
+            foreach (var mediaUrl in product.MediaUrls)
             {
-                ProductMedias = product.MediaUrls.Select(url => new MediaFile { Url = url }).ToList(),
-                Name = product.Name,
-                Price = product.Price,
-                Description = product.Description,
-                UserId = product.UserId,
-                CategoryId = product.CategoryId,
-                User = user,
-                Category = category
-
-            };
-            await _dbContext.Products.AddAsync(newProduct);
-            await _dbContext.SaveChangesAsync();
+                if (mediaUrl == null)
+                {
+                    _logger.LogError("MediaUrl is null");
+                    return BadRequest();
+                }
+                await _mediaRepository.AddMediaAsync(mediaUrl, newProduct.Id);
+            }
             return Ok();
         }
 

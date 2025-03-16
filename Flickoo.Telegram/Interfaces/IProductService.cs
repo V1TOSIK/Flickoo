@@ -12,19 +12,19 @@ namespace Flickoo.Telegram.Interfaces
         Task<ProductSessionState> AddProduct(ITelegramBotClient botClient,
             long chatId,
             long categoryId,
-            List<string?> mediaUrl,
             string? productName,
             decimal? productPrice,
             string? productDescription,
+            List<string?> mediaUrl,
             CancellationToken cancellationToken);
 
         Task UpdateProduct(ITelegramBotClient botClient,
             long chatId,
             long categoryId,
-            List<string?> mediaUrl,
             string? productName,
             decimal? productPrice,
             string? productDescription,
+            List<string?> mediaUrl,
             CancellationToken cancellationToken);
      
         Task DeleteProduct(ITelegramBotClient botClient,

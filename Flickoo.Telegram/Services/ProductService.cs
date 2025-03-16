@@ -13,16 +13,19 @@ namespace Flickoo.Telegram.Services
         private readonly ITelegramBotClient _botClient;
         private readonly HttpClient _httpClient;
         private readonly ILogger<ProductService> _logger;
+        private readonly MainKeyboard _mainKeyboard;
         private readonly AddProductCategoryInlineKeyboard _addProductCategoryInlineKeyboard;
 
         public ProductService(ITelegramBotClient botClient,
             HttpClient httpClient,
             ILogger<ProductService> logger,
+            MainKeyboard mainKeyboard,
             AddProductCategoryInlineKeyboard addProductCategoryInlineKeyboard)
         {
             _botClient = botClient;
             _httpClient = httpClient;
             _logger = logger;
+            _mainKeyboard = mainKeyboard;
             _addProductCategoryInlineKeyboard = addProductCategoryInlineKeyboard;
         }
 
@@ -99,10 +102,10 @@ namespace Flickoo.Telegram.Services
         public async Task<ProductSessionState> AddProduct(ITelegramBotClient botClient,
             long chatId,
             long categoryId,
-            List<string?> mediaUrl,
             string? productName,
             decimal? productPrice,
             string? productDescription,
+            List<string?> mediaUrl,
             CancellationToken cancellationToken)
         {
             if(categoryId  == 0)
@@ -113,12 +116,6 @@ namespace Flickoo.Telegram.Services
                 return ProductSessionState.WaitingForCategory;
             }
 
-            if (mediaUrl == null || mediaUrl.Count() == 0)
-            {
-                _logger.LogWarning("Виберіть фото продукту");
-                await botClient.SendMessage(chatId, "Виберіть фото продукту\nПОПЕРЕДЖЕННЯ!\nOбрати можна лише 4 фото/відео", cancellationToken: cancellationToken);
-                return ProductSessionState.WaitingForMedia;
-            }
 
             if (string.IsNullOrEmpty(productName))
             {
@@ -129,8 +126,8 @@ namespace Flickoo.Telegram.Services
 
             if (productPrice == null || productPrice < 1)
             {
-                _logger.LogWarning("Ціна не може бути менше 1 грн");
-                await botClient.SendMessage(chatId, "Ціна не може бути менше 1 грн", cancellationToken: cancellationToken);
+                _logger.LogWarning("Введіть ціну");
+                await botClient.SendMessage(chatId, "Введіть ціну", cancellationToken: cancellationToken);
                 return ProductSessionState.WaitingForPrice;
             }
 
@@ -141,6 +138,12 @@ namespace Flickoo.Telegram.Services
                 return ProductSessionState.WaitingForDescription;
             }
 
+            if (mediaUrl == null || mediaUrl.Count() > 5)
+            {
+                _logger.LogWarning("Виберіть фото продукту");
+                await botClient.SendMessage(chatId, "Виберіть фото продукту\nПОПЕРЕДЖЕННЯ!\nOбрати можна лише 5 фото/відео", cancellationToken: cancellationToken);
+                return ProductSessionState.WaitingForMedia;
+            }
             var product = new CreateOrUpdateProductRequest
             {
                 MediaUrl = mediaUrl,
@@ -154,12 +157,12 @@ namespace Flickoo.Telegram.Services
             var response = await _httpClient.PostAsJsonAsync("https://localhost:8443/api/Product", product, cancellationToken);
             if (response.IsSuccessStatusCode)
             {
-                await botClient.SendMessage(chatId, "Продукт успішно додано", cancellationToken: cancellationToken);
+                await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Продукт успішно додано");
                 _logger.LogInformation("Продукт успішно додано");
             }
             else
             {
-                await botClient.SendMessage(chatId, "Помилка при додаванні продукту", cancellationToken: cancellationToken);
+                await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Помилка при додаванні продукту");
                 _logger.LogError("Помилка при додаванні продукту");
             }
 
@@ -169,10 +172,10 @@ namespace Flickoo.Telegram.Services
         public async Task UpdateProduct(ITelegramBotClient botClient,
             long chatId,
             long categoryId,
-            List<string?> mediaUrl,
             string? productName,
             decimal? productPrice,
             string? productDescription,
+            List<string?> mediaUrl,
             CancellationToken cancellationToken)
         {
             throw new NotImplementedException();
