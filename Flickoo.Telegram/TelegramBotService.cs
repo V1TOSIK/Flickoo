@@ -390,68 +390,30 @@ namespace Flickoo.Telegram
 
         private async Task<string?> SavePhoto(ITelegramBotClient botClient, Message msg, long chatId, CancellationToken cancellationToken)
         {
-            var photo = msg?.Photo?.Last();
-            var video = msg?.Video;
-
-            if (photo == null && video == null)
+            if (msg == null)
             {
-                _logger.LogWarning("Фото або відео не знайдено.");
+                _logger.LogWarning("Пусте повідомлення.");
                 return "";
             }
 
-            if (photo != null)
+            if (msg.Photo == null && msg.Video == null)
             {
-                var file = await botClient.GetFile(photo.FileId, cancellationToken);
-                var filePath = file.FilePath;
-                if (string.IsNullOrEmpty(filePath))
-                {
-                    _logger.LogWarning("Не вдалося отримати шлях до файлу {FileId}", photo.FileId);
-                    return "";
-                }
-                using (var fileStream = new MemoryStream())
-                {
-                    await botClient.DownloadFile(filePath, fileStream);
-
-                    fileStream.Seek(0, SeekOrigin.Begin);
-
-                    var fileName = $"{photo.FileId}.jpg";
-
-                    var isAdded = await _mediaService.SaveProductMediaFile(fileStream, fileName, chatId);
-
-                    if (isAdded)
-                        return _mediaService.GetProductMediaFilePath(chatId, fileName);
-
-                }
+                _logger.LogWarning("Повідомлення не містить фото/відео.");
+                return "";
             }
-            else if (video != null)
-            {
-                var file = await botClient.GetFile(video.FileId, cancellationToken);
-                var filePath = file.FilePath;
-                if (string.IsNullOrEmpty(filePath))
-                {
-                    _logger.LogWarning("Не вдалося отримати шлях до файлу {FileId}", video.FileId);
-                    return "";
-                }
-                using (var fileStream = new MemoryStream())
-                {
-                    await botClient.DownloadFile(filePath, fileStream);
-                    if (string.IsNullOrEmpty(video.FileName))
-                    {
-                        _logger.LogWarning("Не вдалося отримати ім'я файлу {FileId}", video.FileId);
-                        return "";
-                    }
 
-                    fileStream.Seek(0, SeekOrigin.Begin);
+            if (msg.Photo == null)
+                _logger.LogWarning("Повідомлення не містить фото.");
 
-                    var fileName = $"{video.FileId}.mp4";
-                    var isAdded = await _mediaService.SaveProductMediaFile(fileStream, fileName, chatId);
+            else
+                return msg.Photo.Last().FileId;
+                
+            if(msg.Video == null)
+                _logger.LogWarning("Повідомлення не містить відео.");
 
-                    if (isAdded)
-                        return _mediaService.GetProductMediaFilePath(chatId, fileName);
+            else
+                return msg.Video.FileId;
 
-
-                }
-            }
             return "";
         }
 

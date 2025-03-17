@@ -38,12 +38,13 @@ namespace Flickoo.Telegram.Services
             {
                 throw new ArgumentNullException(nameof(chatId));
             }
+
             var productResponse = await _httpClient.GetAsync($"https://localhost:8443/api/Product/{chatId}", cancellationToken);
 
             if (productResponse.IsSuccessStatusCode)
             {
-
                 var products = await productResponse.Content.ReadFromJsonAsync<List<GetProductResponse>>(cancellationToken: cancellationToken);
+
                 if (products == null || products.Count() == 0)
                 {
                     await botClient.SendMessage(chatId, "Ви ще не додали жодного продукту", cancellationToken: cancellationToken);
@@ -56,37 +57,30 @@ namespace Flickoo.Telegram.Services
                         var mediaList = new List<IAlbumInputMedia>();
                         if (products != null)
                         {
-                            if (product.MediaUrls == null || product.MediaUrls.Count() == 0)
+                            if (product.MediaUrls == null || product.MediaUrls.Count == 0)
                             {
                                 await botClient.SendMessage(chatId, $"{product.Name}\n{product.Price} грн\n{product.Description}", cancellationToken: cancellationToken);
                             }
                             else
                             {
-                                
+
                                 foreach (var media in product.MediaUrls)
                                 {
                                     if (media != null)
                                     {
-                                        if (media.EndsWith(".mp4"))
-                                            mediaList.Add(new InputMediaPhoto(media));
-
-                                        else if (media.EndsWith(".jpg") || media.EndsWith(".png"))
-                                            mediaList.Add(new InputMediaPhoto(media));
-
-                                        else
-                                        {
-                                            await botClient.SendMessage(chatId, "Невідомий формат файлу", cancellationToken: cancellationToken);
-                                            _logger.LogWarning("Невідомий формат файлу");
-                                        }
+                                        mediaList.Add(new InputMediaPhoto(media));
                                     }
+                                }
+                                if (mediaList.Count > 0)
+                                {
                                     await botClient.SendMediaGroup(chatId, mediaList, cancellationToken: cancellationToken);
-                                    await botClient.SendMessage(chatId, $"{product.Name}\n{product.Price} грн\n{product.Description}", cancellationToken: cancellationToken);
                                 }
 
+                                await botClient.SendMessage(chatId, $"{product.Name}\n{product.Price} грн\n{product.Description}", cancellationToken: cancellationToken);
                             }
                         }
-                        _logger.LogInformation("Продукти успішно відправлені");
                     }
+                    _logger.LogInformation("Продукти успішно відправлені");
                 }
             }
             else if (productResponse.StatusCode == System.Net.HttpStatusCode.NotFound)

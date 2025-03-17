@@ -8,7 +8,7 @@ namespace Flickoo.Telegram.Services
         private readonly HttpClient _httpClient;
         private readonly ILogger<MediaService> _logger;
         private readonly ITelegramBotClient _botClient;
-        private string _mainDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MediaFolder");
+        private string _mainDirectory = Path.Combine(@"..", "MediaFolder");
 
         public MediaService(HttpClient httpClient,
             ILogger<MediaService> logger,
@@ -52,6 +52,8 @@ namespace Flickoo.Telegram.Services
         public string GetProductMediaFilePath(long userId, string fileName)
         {
             return Path.Combine(_mainDirectory, userId.ToString(), fileName);
+            
+           
         }
     }
 }
