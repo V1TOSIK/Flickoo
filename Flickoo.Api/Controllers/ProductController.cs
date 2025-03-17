@@ -43,7 +43,7 @@ namespace Flickoo.Api.Controllers
 
         // GET api/<ProductController>/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<ICollection<Product>>> GetByUserId([FromRoute]long id)
+        public async Task<ActionResult<ICollection<Product>>> GetByUserId([FromRoute] long id)
         {
             if (id == 0)
                 return BadRequest();
@@ -54,12 +54,21 @@ namespace Flickoo.Api.Controllers
             var userProducts = await _dbContext.Products
                 .AsNoTracking()
                 .Where(p => p.UserId == id)
-                .OrderBy(p => p.CreatedAt)/*
-                .Select(p => p.ProductMedias)*/
+                .OrderBy(p => p.CreatedAt)
+                .Include(p => p.Category)
+                .Include(p => p.ProductMedias)
                 .ToListAsync();
 
+            var productResponse = userProducts.Select(p => new ProductResponse
+            {
+                Name = p.Name,
+                Price = p.Price,
+                Description = p.Description,
+                CategoryName = p.Category?.Name,
+                MediaUrls = p.ProductMedias?.Select(m => m.Url).ToList() ?? new List<string>()
+            }).ToList();
 
-            return Ok(userProducts);
+            return Ok(productResponse);
         }
 
         [HttpGet("category")]

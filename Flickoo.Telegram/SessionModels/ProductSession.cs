@@ -11,5 +11,6 @@ namespace Flickoo.Telegram.SessionModels
         public string ProductDescription { get; set; } = string.Empty;
         public long UserId { get; set; }
         public long CategoryId { get; set; }
+        public bool AddMoreMedia { get; set; } = true;
     }
 }

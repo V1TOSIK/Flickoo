@@ -26,7 +26,7 @@ IHost host = Host.CreateDefaultBuilder(args)
         services.AddTransient<MainKeyboard>();
         services.AddTransient<AddProductCategoryInlineKeyboard>();
         services.AddTransient<MyProductKeyboard>();
-        services.AddTransient<AddProductCategoryInlineKeyboard>();
+        services.AddTransient<AddProductMediaKeyboard>();
     })
     .Build();
 

@@ -16,6 +16,7 @@ namespace Flickoo.Telegram.Interfaces
             decimal? productPrice,
             string? productDescription,
             List<string?> mediaUrl,
+            bool addMoreMedia,
             CancellationToken cancellationToken);
 
         Task UpdateProduct(ITelegramBotClient botClient,
@@ -25,6 +26,7 @@ namespace Flickoo.Telegram.Interfaces
             decimal? productPrice,
             string? productDescription,
             List<string?> mediaUrl,
+            bool addMoreMedia,
             CancellationToken cancellationToken);
      
         Task DeleteProduct(ITelegramBotClient botClient,

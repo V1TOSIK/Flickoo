@@ -12,7 +12,6 @@ builder.Services.AddLogging();
 
 builder.Services.ConfigureTelegramBotMvc();
 
-
 builder.Services.AddDbContext<FlickooDbContext>();
 
 builder.Services.AddScoped<IMediaRepository, MediaRepository>();

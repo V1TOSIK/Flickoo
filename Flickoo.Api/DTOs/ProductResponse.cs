@@ -1,6 +1,6 @@
-﻿namespace Flickoo.Telegram.DTOs
+﻿namespace Flickoo.Api.DTOs
 {
-    class GetProductResponse
+    public class ProductResponse
     {
         public string Name { get; set; } = string.Empty;
         public decimal Price { get; set; }

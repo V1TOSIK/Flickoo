@@ -76,7 +76,7 @@ namespace Flickoo.Telegram
         {
             var chatId = msg.Chat.Id;
             var userName = msg.From?.Username ?? "Unknown";
-            if(msg.MediaGroupId != null)
+            if (msg.Photo != null)
             {
                 _logger.LogInformation($"Отримано фото | ChatId: {chatId} | UserName: {userName} | Time: {DateTime.UtcNow}");
             }
@@ -88,14 +88,16 @@ namespace Flickoo.Telegram
             }
             _logger.LogInformation($"Отримано повiдомлення: {msg.Text} | ChatId: {chatId} | UserName: {userName} | Time: {DateTime.UtcNow}");
 
-            if(await HandleBaseCommand(botClient, chatId, msg, cancellationToken))
+            if (await HandleBaseCommand(botClient, chatId, msg, cancellationToken))
                 return;
 
             if (await UserSessionCheck(botClient, chatId, msg, cancellationToken))
                 return;
+            _userSessions.Remove(chatId);
 
-            if(await ProductSessionCheck(botClient, chatId, msg, cancellationToken))
+            if (await ProductSessionCheck(botClient, chatId, msg, cancellationToken))
                 return;
+            _productSessions.Remove(chatId);
 
             await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Вибери потрібну команду на панелі");
 
@@ -110,10 +112,8 @@ namespace Flickoo.Telegram
             if (string.IsNullOrEmpty(command.Text))
             {
                 _logger.LogWarning("Пуста команда.");
-                await botClient.SendMessage(chatId, "Пуста команда.", cancellationToken: cancellationToken);
                 return false;
             }
-
             switch (command.Text.ToLower())
             {
                 case "/start":
@@ -199,10 +199,8 @@ namespace Flickoo.Telegram
             if (string.IsNullOrEmpty(command.Text))
             {
                 _logger.LogWarning("Пуста команда.");
-                await botClient.SendMessage(chatId, "Пуста команда.", cancellationToken: cancellationToken);
                 return false;
             }
-
             switch (command.Text.ToLower())
             {
                 case "мій профіль":
@@ -216,7 +214,7 @@ namespace Flickoo.Telegram
                         userSession.LocationName,
                         cancellationToken);
                     return true;
-    
+
                 case "оновити дані":
                     _userSessions[chatId].State = await _userService.UpdateAccount(botClient,
                         chatId,
@@ -266,6 +264,7 @@ namespace Flickoo.Telegram
                             _productSessions[chatId].Price,
                             _productSessions[chatId].ProductDescription,
                             _productSessions[chatId].MediaUrls,
+                            _productSessions[chatId].AddMoreMedia,
                             cancellationToken);
                         return true;
 
@@ -289,6 +288,7 @@ namespace Flickoo.Telegram
                             _productSessions[chatId].Price,
                             _productSessions[chatId].ProductDescription,
                             _productSessions[chatId].MediaUrls,
+                            _productSessions[chatId].AddMoreMedia,
                             cancellationToken);
                         return true;
 
@@ -307,6 +307,7 @@ namespace Flickoo.Telegram
                             _productSessions[chatId].Price,
                             _productSessions[chatId].ProductDescription,
                             _productSessions[chatId].MediaUrls,
+                            _productSessions[chatId].AddMoreMedia,
                             cancellationToken);
                         return true;
 
@@ -318,18 +319,52 @@ namespace Flickoo.Telegram
                             return true;
                         }
 
-                        if (msg.Type != MessageType.Photo)
+                        if (msg.Text == "надіслати фото заново")
                         {
+                            _logger.LogInformation("Повторне надсилання фото/відео");
+                            _productSessions[chatId].MediaUrls.Clear();
+                            _productSessions[chatId].State = await _productService.AddProduct(botClient,
+                                chatId,
+                                _productSessions[chatId].CategoryId,
+                                _productSessions[chatId].ProductName,
+                                _productSessions[chatId].Price,
+                                _productSessions[chatId].ProductDescription,
+                                _productSessions[chatId].MediaUrls,
+                                _productSessions[chatId].AddMoreMedia,
+                                cancellationToken);
+                            return true;
+                        }
+
+                        if (msg.Text == "готово")
+                        {
+                            _productSessions[chatId].AddMoreMedia = false;
+                            _productSessions[chatId].State = await _productService.AddProduct(botClient,
+                                chatId,
+                                _productSessions[chatId].CategoryId,
+                                _productSessions[chatId].ProductName,
+                                _productSessions[chatId].Price,
+                                _productSessions[chatId].ProductDescription,
+                                _productSessions[chatId].MediaUrls,
+                                _productSessions[chatId].AddMoreMedia,
+                                cancellationToken);
+                            _productSessions.Remove(chatId);
+                            return true;
+                        }
+
+                        if (msg.Type != MessageType.Photo && msg.Type != MessageType.Video && string.IsNullOrEmpty(msg.Text))
+                        {
+                            _logger.LogWarning("Ви скинули не фото/відео");
                             await _mainKeyboard.SendMainKeyboard(botClient, chatId, "ви скинули не фото/відео");
                             return true;
                         }
 
-                        if (msg.Photo != null && msg.Photo.Count() > 5)
+                        if (msg.Photo == null || _productSessions[chatId].MediaUrls.Count() >= 5)
                         {
-                            await botClient.SendMessage(chatId, "Не можна зберігати більше 4 фото.", cancellationToken: cancellationToken);
-                            return true;
+                            _productSessions[chatId].MediaUrls.RemoveRange(5, _productSessions[chatId].MediaUrls.Count() - 5);
+                            _productSessions[chatId].AddMoreMedia = false;
                         }
 
+                        _productSessions[chatId].MediaUrls.Add(await SavePhoto(botClient, msg, chatId, cancellationToken));
 
                         _productSessions[chatId].State = await _productService.AddProduct(botClient,
                                 chatId,
@@ -338,6 +373,7 @@ namespace Flickoo.Telegram
                                 _productSessions[chatId].Price,
                                 _productSessions[chatId].ProductDescription,
                                 _productSessions[chatId].MediaUrls,
+                                _productSessions[chatId].AddMoreMedia,
                                 cancellationToken);
 
                         return true;
@@ -348,78 +384,75 @@ namespace Flickoo.Telegram
                 if (await HandleProductCommand(botClient, msg, chatId, _productSessions[chatId], cancellationToken))
                     return true;
             }
-
             return false;
 
         }
 
-        private async Task<List<string?>> SavePhoto(ITelegramBotClient botClient, Message msg, long chatId, CancellationToken cancellationToken)
+        private async Task<string?> SavePhoto(ITelegramBotClient botClient, Message msg, long chatId, CancellationToken cancellationToken)
         {
-            var mediaUrls = new List<string?>();
-            if (msg.Photo != null && (msg.Photo.Count()) > 0)
+            var photo = msg?.Photo?.Last();
+            var video = msg?.Video;
+
+            if (photo == null && video == null)
             {
-                foreach (var photo in msg.Photo)
-                {
-                    var file = await botClient.GetFile(photo.FileId, cancellationToken);
-                    var filePath = file.FilePath;
-                    if (string.IsNullOrEmpty(filePath))
-                    {
-                        _logger.LogWarning("Не вдалося отримати шлях до файлу {FileId}", photo.FileId);
-                        continue;
-                    }
-                    using (var fileStream = new MemoryStream())
-                    {
-                        await botClient.DownloadFile(filePath, fileStream);
-                        if (photo.FileId.EndsWith(".jpg"))
-                        {
-                            var fileName = $"{photo.FileId}.jpg";
-                            var isAdded = await _mediaService.SaveProductMediaFile(fileStream, fileName, chatId);
-                            if (isAdded)
-                                mediaUrls.Add(_mediaService.GetProductMediaFilePath(chatId, fileName));
-                        }
-                        else if (photo.FileId.EndsWith(".png"))
-                        {
-                            var fileName = $"{photo.FileId}.png";
-                            var isAdded = await _mediaService.SaveProductMediaFile(fileStream, fileName, chatId);
-                            if (isAdded)
-                                mediaUrls.Add(_mediaService.GetProductMediaFilePath(chatId, fileName));
-                        }
-                        else
-                        {
-                            continue;
-                        }
-                    }
-                }
+                _logger.LogWarning("Фото або відео не знайдено.");
+                return "";
             }
-            else if (msg.Video != null)
+
+            if (photo != null)
             {
-                var file = await botClient.GetFile(msg.Video.FileId, cancellationToken);
+                var file = await botClient.GetFile(photo.FileId, cancellationToken);
                 var filePath = file.FilePath;
                 if (string.IsNullOrEmpty(filePath))
                 {
-                    _logger.LogWarning("Не вдалося отримати шлях до файлу {FileId}", msg.Video.FileId);
-                    return mediaUrls;
+                    _logger.LogWarning("Не вдалося отримати шлях до файлу {FileId}", photo.FileId);
+                    return "";
                 }
                 using (var fileStream = new MemoryStream())
                 {
                     await botClient.DownloadFile(filePath, fileStream);
-                    if (string.IsNullOrEmpty(msg.Video.FileName))
-                    {
-                        _logger.LogWarning("Не вдалося отримати ім'я файлу {FileId}", msg.Video.FileId);
-                        return mediaUrls;
-                    }
 
-                    if (msg.Video.FileName.EndsWith(".mp4"))
-                    {
-                        var fileName = ".mp4";
-                        var isAdded = await _mediaService.SaveProductMediaFile(fileStream, fileName, chatId);
-                        if (isAdded)
-                            mediaUrls.Add(_mediaService.GetProductMediaFilePath(chatId, fileName));
-                    }
-                    
+                    fileStream.Seek(0, SeekOrigin.Begin);
+
+                    var fileName = $"{photo.FileId}.jpg";
+
+                    var isAdded = await _mediaService.SaveProductMediaFile(fileStream, fileName, chatId);
+
+                    if (isAdded)
+                        return _mediaService.GetProductMediaFilePath(chatId, fileName);
+
                 }
             }
-            return mediaUrls;
+            else if (video != null)
+            {
+                var file = await botClient.GetFile(video.FileId, cancellationToken);
+                var filePath = file.FilePath;
+                if (string.IsNullOrEmpty(filePath))
+                {
+                    _logger.LogWarning("Не вдалося отримати шлях до файлу {FileId}", video.FileId);
+                    return "";
+                }
+                using (var fileStream = new MemoryStream())
+                {
+                    await botClient.DownloadFile(filePath, fileStream);
+                    if (string.IsNullOrEmpty(video.FileName))
+                    {
+                        _logger.LogWarning("Не вдалося отримати ім'я файлу {FileId}", video.FileId);
+                        return "";
+                    }
+
+                    fileStream.Seek(0, SeekOrigin.Begin);
+
+                    var fileName = $"{video.FileId}.mp4";
+                    var isAdded = await _mediaService.SaveProductMediaFile(fileStream, fileName, chatId);
+
+                    if (isAdded)
+                        return _mediaService.GetProductMediaFilePath(chatId, fileName);
+
+
+                }
+            }
+            return "";
         }
 
         private async Task<bool> HandleProductCommand(ITelegramBotClient botClient,
@@ -431,7 +464,6 @@ namespace Flickoo.Telegram
             if (string.IsNullOrEmpty(command.Text))
             {
                 _logger.LogWarning("Пуста команда.");
-                await botClient.SendMessage(chatId, "Пуста команда.", cancellationToken: cancellationToken);
                 return false;
             }
 
@@ -449,6 +481,7 @@ namespace Flickoo.Telegram
                         _productSessions[chatId].Price,
                         _productSessions[chatId].ProductDescription,
                         _productSessions[chatId].MediaUrls,
+                        _productSessions[chatId].AddMoreMedia,
                         cancellationToken);
                     break;
 
@@ -488,6 +521,7 @@ namespace Flickoo.Telegram
                             _productSessions[chatId].Price,
                             _productSessions[chatId].ProductDescription,
                             _productSessions[chatId].MediaUrls,
+                            _productSessions[chatId].AddMoreMedia,
                             cancellationToken);
                         break;
 
