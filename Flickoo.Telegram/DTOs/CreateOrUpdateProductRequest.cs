@@ -1,6 +1,6 @@
 ﻿namespace Flickoo.Telegram.DTOs
 {
-    class CreateOrUpdateProductRequest
+    public class CreateOrUpdateProductRequest
     {
         public string Name { get; set; } = string.Empty;
         public decimal Price { get; set; }

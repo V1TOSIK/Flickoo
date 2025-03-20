@@ -5,9 +5,9 @@ using Telegram.Bot.Types.ReplyMarkups;
 
 namespace Flickoo.Telegram.Keyboards
 {
-    public class AddProductCategoryInlineKeyboard
+    public class CategoriesInlineKeyboard
     {
-        public async Task<InlineKeyboardMarkup> SendCategoriesInlineButtonsAsync(HttpClient _httpClient, ITelegramBotClient botClient, long chatId, CancellationToken cancellationToken)
+        public async Task<InlineKeyboardMarkup> SendInlineButtonsAsync(HttpClient _httpClient, ITelegramBotClient botClient, long chatId, CancellationToken cancellationToken)
         {
             List<CategoryDto> categories = new();
             var response = await _httpClient.GetAsync("https://localhost:8443/api/Product/category");
@@ -27,6 +27,11 @@ namespace Flickoo.Telegram.Keyboards
                     InlineKeyboardButton.WithCallbackData(category.Name, category.Id.ToString())
                 })
                 .ToList();
+
+            keyboardButtons.Add(new[]
+            {
+                InlineKeyboardButton.WithCallbackData("Всі оголошення", "0")
+            });
 
             return new InlineKeyboardMarkup(keyboardButtons);
         }

@@ -22,7 +22,7 @@ namespace Flickoo.Api.Data.Configurations
                 .WithMany(c => c.Products)
                 .HasForeignKey(p => p.CategoryId)
                 .OnDelete(DeleteBehavior.Cascade);
-            builder.HasMany(p => p.ProductMedias)
+            builder.HasMany(p => p.MediaUrls)
                 .WithOne(pm => pm.Product)
                 .HasForeignKey(pm => pm.ProductId)
                 .OnDelete(DeleteBehavior.Cascade);

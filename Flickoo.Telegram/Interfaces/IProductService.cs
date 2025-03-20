@@ -1,4 +1,5 @@
-﻿using Flickoo.Telegram.enums;
+﻿using Flickoo.Telegram.DTOs;
+using Flickoo.Telegram.enums;
 using Telegram.Bot;
 
 namespace Flickoo.Telegram.Interfaces
@@ -7,6 +8,11 @@ namespace Flickoo.Telegram.Interfaces
     {
         Task GetProducts(ITelegramBotClient botClient,
             long chatId,
+            CancellationToken cancellationToken);
+
+        Task<Queue<GetProductResponse>> GetProductsForSwaping(ITelegramBotClient botClient,
+            long chatId,
+            long categoryId,
             CancellationToken cancellationToken);
 
         Task<ProductSessionState> AddProduct(ITelegramBotClient botClient,
@@ -19,9 +25,9 @@ namespace Flickoo.Telegram.Interfaces
             bool addMoreMedia,
             CancellationToken cancellationToken);
 
-        Task UpdateProduct(ITelegramBotClient botClient,
+        Task<ProductSessionState> UpdateProduct(ITelegramBotClient botClient,
+            long productId,
             long chatId,
-            long categoryId,
             string? productName,
             decimal? productPrice,
             string? productDescription,
@@ -31,7 +37,21 @@ namespace Flickoo.Telegram.Interfaces
      
         Task DeleteProduct(ITelegramBotClient botClient,
             long chatId,
-            string productName,
+            long productId,
+            CancellationToken cancellationToken);
+
+        Task LikeProduct(ITelegramBotClient botClient,
+            long chatId,
+            long productId,
+            CancellationToken cancellationToken);
+        
+        Task DislikeProduct(ITelegramBotClient botClient,
+            long chatId,
+            long productId,
+            CancellationToken cancellationToken);
+
+        Task<Queue<GetProductResponse>> GetLikedProducts(ITelegramBotClient botClient,
+            long chatId,
             CancellationToken cancellationToken);
     }
 }

@@ -18,7 +18,7 @@
         public long CategoryId { get; set; }
         public Category? Category { get; set; }
 
-        public List<MediaFile> ProductMedias { get; set; } = [];
+        public List<MediaFile> MediaUrls { get; set; } = [];
 
         public List<Like> Likes { get; set; } = [];
     }

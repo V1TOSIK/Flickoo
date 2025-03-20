@@ -18,8 +18,8 @@ public class MainKeyboard(ILogger<TelegramBotService> logger)
         {
             new KeyboardButton("мій профіль"),
             new KeyboardButton("мої оголошення"),
-            new KeyboardButton("мої лайки"),
-            new KeyboardButton("почати")
+            new KeyboardButton("вподобане"),
+            new KeyboardButton("оголошення")
 
         })
         {

@@ -7,7 +7,7 @@ namespace Flickoo.Api.Interfaces
     {
         public Task<IEnumerable<Product>> GetProductsAsync();
         public Task<Product?> GetProductByIdAsync(long id);
-        public Task<Product?> AddProductAsync(CreateProductRequest product);
+        public Task<Product?> AddProductAsync(CreateOrUpdateProductRequest product);
         public Task UpdateProductAsync(Product product);
         public Task DeleteProductAsync(long id);
     }

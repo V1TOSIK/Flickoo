@@ -13,7 +13,7 @@ namespace Flickoo.Api.Data.Configurations
             builder.Property(mf => mf.Url).IsRequired();
             builder.Property(mf => mf.TypeOfMedia).IsRequired();
             builder.HasOne(mf => mf.Product)
-                .WithMany(p => p.ProductMedias)
+                .WithMany(p => p.MediaUrls)
                 .HasForeignKey(mf => mf.ProductId)
                 .OnDelete(DeleteBehavior.Cascade);
         }

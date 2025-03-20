@@ -29,18 +29,6 @@ namespace Flickoo.Api.Controllers
 
         }
 
-        // GET: api/<ProductController>
-        [HttpGet]
-        public async Task<ActionResult<ICollection<Product>>> Get()
-        {
-            var productList = await _dbContext.Products
-                .AsNoTracking()
-                .OrderBy(p => p.CreatedAt)
-                .ToListAsync();
-
-            return Ok(productList);
-        }
-
         // GET api/<ProductController>/5
         [HttpGet("{id}")]
         public async Task<ActionResult<ICollection<Product>>> GetByUserId([FromRoute] long id)
@@ -54,21 +42,77 @@ namespace Flickoo.Api.Controllers
             var userProducts = await _dbContext.Products
                 .AsNoTracking()
                 .Where(p => p.UserId == id)
-                .OrderBy(p => p.CreatedAt)
+                .OrderByDescending(p => p.CreatedAt)
                 .Include(p => p.Category)
-                .Include(p => p.ProductMedias)
+                .Include(p => p.MediaUrls)
                 .ToListAsync();
 
             var productResponse = userProducts.Select(p => new ProductResponse
             {
+                Id = p.Id,
                 Name = p.Name,
                 Price = p.Price,
                 Description = p.Description,
-                CategoryName = p.Category?.Name,
-                MediaUrls = p.ProductMedias?.Select(m => m.Url).ToList() ?? new List<string>()
+                CategoryName = p.Category?.Name ?? "",
+                MediaUrls = p.MediaUrls?.Select(m => m?.Url).ToList() ?? []
             }).ToList();
 
             return Ok(productResponse);
+        }
+
+        [HttpGet("liked/{userId}")]
+        public async Task<ActionResult<ICollection<ProductResponse>>> GetLikedProduct([FromRoute]long userId)
+        {
+
+            return Ok();
+        }
+
+        [HttpGet("bycategory/{categoryid}")]
+        public async Task<ActionResult<ICollection<Product>>> GetByCategory([FromRoute] long categoryId)
+        {
+            if (categoryId == 0)
+            {
+                var productList = await _dbContext.Products
+                    .AsNoTracking()
+                    .OrderByDescending(p => p.CreatedAt)
+                    .Include(p => p.Category)
+                    .Include(p => p.MediaUrls)
+                    .ToListAsync();
+
+                var productResponse = productList.Select(p => new ProductResponse
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Price = p.Price,
+                    Description = p.Description,
+                    CategoryName = p.Category?.Name ?? "",
+                    MediaUrls = p.MediaUrls?.Select(m => m?.Url).ToList() ?? []
+                }).ToList();
+
+                return Ok(productResponse);
+            }
+
+            if (!await _dbContext.Categories.AnyAsync(c => c.Id == categoryId))
+                return NotFound();
+
+            var categoryProducts = await _dbContext.Products
+                .AsNoTracking()
+                .Where(p => p.CategoryId == categoryId)
+                .OrderByDescending(p => p.CreatedAt)
+                .Include(p => p.Category)
+                .Include(p => p.MediaUrls)
+                .ToListAsync();
+            var productByCategoryResponse = categoryProducts.Select(p => new ProductResponse
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Price = p.Price,
+                Description = p.Description,
+                CategoryName = p.Category?.Name ?? "",
+                MediaUrls = p.MediaUrls?.Select(m => m?.Url).ToList() ?? []
+            }).ToList();
+
+            return Ok(productByCategoryResponse);
         }
 
         [HttpGet("category")]
@@ -82,7 +126,7 @@ namespace Flickoo.Api.Controllers
 
         // POST api/<ProductController>
         [HttpPost]
-        public async Task<ActionResult> Post([FromBody] CreateProductRequest product)
+        public async Task<ActionResult> Post([FromBody] CreateOrUpdateProductRequest product)
         {
             var newProduct = await _productRepository.AddProductAsync(product);
 
@@ -101,15 +145,68 @@ namespace Flickoo.Api.Controllers
             return Ok();
         }
 
+        [HttpPost("like/{productId}/user/{userId}")]
+        public async Task<ActionResult> Like([FromRoute] long productId, [FromRoute] long userId)
+        {
+            var productExists = await _dbContext.Products.FirstOrDefaultAsync(p => p.Id == productId);
+
+            if (productExists == null)
+                return NotFound();
+
+            var userExists = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
+            if (userExists == null)
+                return NotFound();
+
+            var newLike = new Like
+            {
+                ProductId = productId,
+                Product = productExists,
+                UserId = userId,
+                User = userExists
+            };
+
+            await _dbContext.Likes.AddAsync(newLike);
+            await _dbContext.SaveChangesAsync();
+            return Ok();
+        }
+
         // PUT api/<ProductController>/5
         [HttpPut("{id}")]
-        public async Task<ActionResult> Put([FromRoute] long id,
-            string name,
-            decimal price,
-            string description,
-            long categoryId)
+        public async Task<ActionResult> Put([FromRoute] long id, [FromBody] CreateOrUpdateProductRequest product)
         {
 
+            var productFromDb = await _dbContext.Products.FirstOrDefaultAsync(p => p.Id == id);
+
+            if (productFromDb == null)
+                return NotFound();
+
+            var name = product.Name ?? productFromDb.Name;
+            var price = product.Price;
+            var description = product.Description ?? productFromDb.Description;
+
+            if (product.MediaUrls == null)
+            {
+                _logger.LogError("MediaUrls is null");
+                return BadRequest();
+            }
+
+            _dbContext.MediaFiles
+                .Where(m => m.ProductId == id)
+                .ExecuteDelete();
+
+            foreach (var mediaUrl in product.MediaUrls)
+            {
+                if (mediaUrl == null)
+                {
+                    _logger.LogError("MediaUrl is null");
+                    return BadRequest();
+                }
+                productFromDb.MediaUrls.Add(new MediaFile
+                {
+                    ProductId = productFromDb.Id,
+                    Url = mediaUrl
+                });
+            }
 
             await _dbContext.Products
                 .Where(p => p.Id == id)
@@ -117,9 +214,8 @@ namespace Flickoo.Api.Controllers
                     .SetProperty(p => p.Name, name)
                     .SetProperty(p => p.Price, price)
                     .SetProperty(p => p.Description, description)
-                    .SetProperty(p => p.CategoryId, categoryId)
                 );
-
+            await _dbContext.SaveChangesAsync();
             return Ok();
         }
 

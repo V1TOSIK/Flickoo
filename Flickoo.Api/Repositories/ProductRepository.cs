@@ -39,7 +39,7 @@ namespace Flickoo.Api.Repositories
             return product;
         }
 
-        public async Task<Product?> AddProductAsync(CreateProductRequest product)
+        public async Task<Product?> AddProductAsync(CreateOrUpdateProductRequest product)
         {
             var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == product.UserId);
             if (user == null)
@@ -65,7 +65,7 @@ namespace Flickoo.Api.Repositories
                 CategoryId = product.CategoryId,
                 User = user,
                 Category = category,
-                ProductMedias = []
+                MediaUrls = []
 
             };
             await _dbContext.Products.AddAsync(newProduct);

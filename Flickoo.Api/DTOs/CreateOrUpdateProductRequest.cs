@@ -1,6 +1,6 @@
 ﻿namespace Flickoo.Api.DTOs
 {
-    public class CreateProductRequest
+    public class CreateOrUpdateProductRequest
     {
         public string Name { get; set; } = string.Empty;
         public decimal Price { get; set; }

@@ -3,10 +3,17 @@
     public enum ProductSessionState
     {
         Idle,
+        AwaitCategoryForSwaping,
+        SwapingLikedProducts,
         WaitingForCategory,
         WaitingForProductName,
         WaitingForPrice,
         WaitingForDescription,
-        WaitingForMedia
+        WaitingForMedia,
+        WaitingForCategoryUpdate,
+        WaitingForProductNameUpdate,
+        WaitingForPriceUpdate,
+        WaitingForDescriptionUpdate,
+        WaitingForMediaUpdate
     }
 }
