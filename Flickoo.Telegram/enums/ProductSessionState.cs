@@ -14,6 +14,8 @@
         WaitingForProductNameUpdate,
         WaitingForPriceUpdate,
         WaitingForDescriptionUpdate,
-        WaitingForMediaUpdate
+        WaitingForMediaUpdate,
+        AddProduct,
+        UpdateProduct
     }
 }

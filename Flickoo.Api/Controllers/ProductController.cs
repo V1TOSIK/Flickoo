@@ -192,6 +192,12 @@ namespace Flickoo.Api.Controllers
             if (userExists == null)
                 return NotFound();
 
+            var likeExists = await _dbContext.Likes
+                .AnyAsync(l => l.ProductId == productId && l.UserId == userId);
+
+            if (likeExists)
+                return Ok();
+
             var newLike = new Like
             {
                 ProductId = productId,

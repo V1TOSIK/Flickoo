@@ -1,9 +1,17 @@
-﻿namespace Flickoo.Telegram.Interfaces
+﻿using Telegram.Bot.Types;
+using Telegram.Bot;
+
+namespace Flickoo.Telegram.Interfaces
 {
     public interface IMediaService
     {
-        string GetProductMediaPath(long chatId);
-        Task<bool> SaveProductMediaFile(Stream fileStream, string fileName, long chatId);
-        string GetProductMediaFilePath(long userId, string fileName);
+        Task<string> GetMediaIdFromMsg(ITelegramBotClient botClient,
+            Message msg,
+            long chatId,
+            CancellationToken cancellationToken);
+
+        Task<List<IAlbumInputMedia>> GetMediaGroup(ITelegramBotClient botClient,
+            List<string?> mediaIds,
+            CancellationToken cancellationToken);
     }
 }

@@ -3,7 +3,7 @@ using Flickoo.Telegram.enums;
 
 namespace Flickoo.Telegram.SessionModels
 {
-    class ProductSession
+    public class ProductSession
     {
         public ProductSessionState State{ get; set; } = ProductSessionState.Idle;
         public long ProductId { get; set; }

@@ -6,7 +6,7 @@ namespace Flickoo.Telegram.Interfaces
 {
     public interface IProductService
     {
-        Task GetProducts(ITelegramBotClient botClient,
+        Task GetUserProducts(ITelegramBotClient botClient,
             long chatId,
             CancellationToken cancellationToken);
 
@@ -40,19 +40,6 @@ namespace Flickoo.Telegram.Interfaces
             long productId,
             CancellationToken cancellationToken);
 
-        Task LikeProduct(ITelegramBotClient botClient,
-            long chatId,
-            long productId,
-            CancellationToken cancellationToken);
         
-        Task DislikeProduct(ITelegramBotClient botClient,
-            long chatId,
-            long productId,
-            CancellationToken cancellationToken);
-
-        Task<Queue<GetProductResponse>> GetLikedProducts(ITelegramBotClient botClient,
-            long chatId,
-            string filter,
-            CancellationToken cancellationToken);
     }
 }

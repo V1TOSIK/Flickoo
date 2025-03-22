@@ -1,5 +1,4 @@
 ﻿using Telegram.Bot;
-using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
 
 namespace Flickoo.Telegram.Keyboards;
@@ -19,7 +18,7 @@ public class MainKeyboard(ILogger<TelegramBotService> logger)
             new KeyboardButton("мій профіль"),
             new KeyboardButton("мої оголошення"),
             new KeyboardButton("вподобане"),
-            new KeyboardButton("оголошення")
+            new KeyboardButton("🚀")
 
         })
         {

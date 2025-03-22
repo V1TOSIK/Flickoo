@@ -2,7 +2,7 @@
 
 namespace Flickoo.Telegram.SessionModels
 {
-    class UserSession
+    public class UserSession
     {
         public UserSessionState State { get; set; } = UserSessionState.Idle;
         public string UserName { get; set; } = string.Empty;

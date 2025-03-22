@@ -23,12 +23,13 @@ namespace Flickoo.Telegram
         private readonly IUserService _userService;
         private readonly IProductService _productService;
         private readonly IMediaService _mediaService;
+        private readonly IFavouriteService _favouriteService;
+        private readonly IUserSessionService _userSessionService;
+        private readonly IProductSessionService _productSessionService;
         private readonly MainKeyboard _mainKeyboard;
         private readonly MyProductKeyboard _myProductKeyboard;
         private readonly CategoriesInlineKeyboard _categoriesInlineKeyboard;
         private readonly LikeInlineKeyboard _likeInlineKeyboard;
-        private readonly Dictionary<long, UserSession> _userSessions = new();
-        private readonly Dictionary<long, ProductSession> _productSessions = new();
         private Queue<GetProductResponse> _productsForSwaping = [];
 
         public TelegramBotService(
@@ -38,6 +39,9 @@ namespace Flickoo.Telegram
             IUserService userService,
             IProductService productService,
             IMediaService mediaService,
+            IFavouriteService favouriteService,
+            IUserSessionService userSessionService,
+            IProductSessionService productSessionService,
             MainKeyboard mainKeyboard,
             MyProductKeyboard myProductKeyboard,
             CategoriesInlineKeyboard categoriesInlineKeyboard,
@@ -49,6 +53,9 @@ namespace Flickoo.Telegram
             _userService = userService;
             _productService = productService;
             _mediaService = mediaService;
+            _favouriteService = favouriteService;
+            _userSessionService = userSessionService;
+            _productSessionService = productSessionService;
             _mainKeyboard = mainKeyboard;
             _myProductKeyboard = myProductKeyboard;
             _categoriesInlineKeyboard = categoriesInlineKeyboard;
@@ -73,7 +80,6 @@ namespace Flickoo.Telegram
 
         private async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             await (update switch
             {
                 { Message: { } message } => OnMessage(botClient, message, cancellationToken),
@@ -104,13 +110,12 @@ namespace Flickoo.Telegram
             if (await HandleBaseCommand(botClient, chatId, msg, cancellationToken))
                 return;
 
-            if (await UserSessionCheck(botClient, chatId, msg, cancellationToken))
+            if (await _userSessionService.UserSessionCheck(botClient, chatId, msg, cancellationToken))
                 return;
-            _userSessions.Remove(chatId);
+            
 
-            if (await ProductSessionCheck(botClient, chatId, msg, cancellationToken))
+            if (await _productSessionService.ProductSessionCheck(botClient, chatId, msg, cancellationToken))
                 return;
-            _productSessions.Remove(chatId);
 
             await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Вибери потрібну команду на панелі");
 
@@ -140,7 +145,7 @@ namespace Flickoo.Telegram
                     return true;
 
 
-                case "оголошення":
+                case "🚀":
                     if (!_productSessions.ContainsKey(chatId))
                         _productSessions[chatId] = new ProductSession();
                     _productSessions[chatId].State = ProductSessionState.AwaitCategoryForSwaping;
@@ -150,466 +155,15 @@ namespace Flickoo.Telegram
 
                 case "назад":
                     await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Дію скасовано");
-                    _userSessions.Remove(chatId);
-                    _productSessions.Remove(chatId);
                     return true;
 
                 default:
                     return false;
             }
         }
-        private async Task<bool> UserSessionCheck(ITelegramBotClient botClient, long chatId, Message msg, CancellationToken cancellationToken)
-        {
-            if (!_userSessions.ContainsKey(chatId))
-                _userSessions[chatId] = new UserSession();
+        
 
-            if (_userSessions[chatId].State != UserSessionState.Idle)
-            {
-                switch (_userSessions[chatId].State)
-                {
-                    case UserSessionState.CreateWaitingForUserName:
-                        if (msg.Text == "назад")
-                        {
-                            _userSessions[chatId].State = UserSessionState.Idle;
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Реєстрацію скасовано");
-                            return true;
-                        }
-                        _userSessions[chatId].UserName = msg.Text ?? "";
-                        _userSessions[chatId].State = await _userService.CreateAccount(botClient, chatId, _userSessions[chatId].UserName, _userSessions[chatId].LocationName, cancellationToken);
-                        return true;
-
-                    case UserSessionState.CreateWaitingForLocation:
-                        if (msg.Text == "назад")
-                        {
-                            _userSessions[chatId].State = UserSessionState.Idle;
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Реєстрацію скасовано");
-                            return true;
-                        }
-                        _userSessions[chatId].LocationName = msg.Text ?? "";
-                        _userSessions[chatId].State = await _userService.CreateAccount(botClient, chatId, _userSessions[chatId].UserName, _userSessions[chatId].LocationName, cancellationToken);
-                        return true;
-
-                    case UserSessionState.UpdateWaitingForUserName:
-                        if (msg.Text == "назад")
-                        {
-                            _userSessions[chatId].State = UserSessionState.Idle;
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Оновлення скасовано");
-                            return true;
-                        }
-                        _userSessions[chatId].UserName = msg.Text ?? "";
-                        _userSessions[chatId].State = await _userService.UpdateAccount(botClient, chatId, _userSessions[chatId].UserName, _userSessions[chatId].LocationName, cancellationToken);
-                        return true;
-                    case UserSessionState.UpdateWaitingForLocation:
-                        if (msg.Text == "назад")
-                        {
-                            _userSessions[chatId].State = UserSessionState.Idle;
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Оновлення скасовано");
-                            return true;
-                        }
-                        _userSessions[chatId].LocationName = msg.Text ?? "";
-                        _userSessions[chatId].State = await _userService.UpdateAccount(botClient, chatId, _userSessions[chatId].UserName, _userSessions[chatId].LocationName, cancellationToken);
-                        return true;
-                }
-            }
-            else
-                return await HandleUserCommand(botClient, msg, chatId, _userSessions[chatId], cancellationToken);
-
-            return false;
-        }
-
-        private async Task<bool> HandleUserCommand(ITelegramBotClient botClient,
-            Message command,
-            long chatId,
-            UserSession userSession,
-            CancellationToken cancellationToken)
-        {
-            if (string.IsNullOrEmpty(command.Text))
-            {
-                _logger.LogWarning("Пуста команда.");
-                return false;
-            }
-            switch (command.Text.ToLower())
-            {
-                case "мій профіль":
-                    await _userService.MyProfile(botClient, chatId, cancellationToken);
-                    return true;
-
-                case "створити акаунт":
-                    _userSessions[chatId].State = await _userService.CreateAccount(botClient,
-                        chatId,
-                        userSession.UserName ?? "",
-                        userSession.LocationName,
-                        cancellationToken);
-                    return true;
-
-                case "оновити дані":
-                    _userSessions[chatId].State = await _userService.UpdateAccount(botClient,
-                        chatId,
-                        userSession.UserName,
-                        userSession.LocationName,
-                        cancellationToken);
-                    if (_userSessions[chatId].State == UserSessionState.Idle)
-                        _userSessions.Remove(chatId);
-                    return true;
-
-                default:
-                    return false;
-            }
-
-        }
-
-        private async Task<bool> ProductSessionCheck(ITelegramBotClient botClient, long chatId, Message msg, CancellationToken cancellationToken)
-        {
-            if (!_productSessions.ContainsKey(chatId))
-                _productSessions[chatId] = new ProductSession();
-
-            if (_productSessions[chatId].State != ProductSessionState.Idle)
-            {
-                switch (_productSessions[chatId].State)
-                {
-                    case ProductSessionState.WaitingForCategory:
-                        if (msg.Text == "назад")
-                        {
-                            _productSessions[chatId].State = ProductSessionState.Idle;
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Додавання продукту скасовано");
-                            return true;
-                        }
-                        return true;
-
-                    case ProductSessionState.WaitingForProductName:
-                        if (msg.Text == "назад")
-                        {
-                            _productSessions[chatId].State = ProductSessionState.Idle;
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Додавання продукту скасовано");
-                            return true;
-                        }
-                        _productSessions[chatId].ProductName = msg.Text ?? "";
-                        _productSessions[chatId].State = await _productService.AddProduct(botClient,
-                            chatId,
-                            _productSessions[chatId].CategoryId,
-                            _productSessions[chatId].ProductName,
-                            _productSessions[chatId].Price,
-                            _productSessions[chatId].ProductDescription,
-                            _productSessions[chatId].MediaUrls,
-                            _productSessions[chatId].AddMoreMedia,
-                            cancellationToken);
-                        return true;
-
-                    case ProductSessionState.WaitingForPrice:
-                        if (msg.Text == "назад")
-                        {
-                            _productSessions[chatId].State = ProductSessionState.Idle;
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Додавання продукту скасовано");
-                            return true;
-                        }
-                        if (!decimal.TryParse(msg.Text, out var price))
-                        {
-                            await botClient.SendMessage(chatId, "Ціна повинна бути числом", cancellationToken: cancellationToken);
-                            return true;
-                        }
-                        _productSessions[chatId].Price = price;
-                        _productSessions[chatId].State = await _productService.AddProduct(botClient,
-                            chatId,
-                            _productSessions[chatId].CategoryId,
-                            _productSessions[chatId].ProductName,
-                            _productSessions[chatId].Price,
-                            _productSessions[chatId].ProductDescription,
-                            _productSessions[chatId].MediaUrls,
-                            _productSessions[chatId].AddMoreMedia,
-                            cancellationToken);
-                        return true;
-
-                    case ProductSessionState.WaitingForDescription:
-                        if (msg.Text == "назад")
-                        {
-                            _productSessions[chatId].State = ProductSessionState.Idle;
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Додавання продукту скасовано");
-                            return true;
-                        }
-                        _productSessions[chatId].ProductDescription = msg.Text ?? "";
-                        _productSessions[chatId].State = await _productService.AddProduct(botClient,
-                            chatId,
-                            _productSessions[chatId].CategoryId,
-                            _productSessions[chatId].ProductName,
-                            _productSessions[chatId].Price,
-                            _productSessions[chatId].ProductDescription,
-                            _productSessions[chatId].MediaUrls,
-                            _productSessions[chatId].AddMoreMedia,
-                            cancellationToken);
-                        return true;
-
-                    case ProductSessionState.WaitingForMedia:
-                        if (msg.Text == "назад")
-                        {
-                            _productSessions[chatId].State = ProductSessionState.Idle;
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Додавання продукту скасовано");
-                            return true;
-                        }
-
-                        if (msg.Text == "надіслати фото заново")
-                        {
-                            _logger.LogInformation("Повторне надсилання фото/відео");
-                            _productSessions[chatId].MediaUrls.Clear();
-                            _productSessions[chatId].State = await _productService.AddProduct(botClient,
-                                chatId,
-                                _productSessions[chatId].CategoryId,
-                                _productSessions[chatId].ProductName,
-                                _productSessions[chatId].Price,
-                                _productSessions[chatId].ProductDescription,
-                                _productSessions[chatId].MediaUrls,
-                                _productSessions[chatId].AddMoreMedia,
-                                cancellationToken);
-                            return true;
-                        }
-
-                        if (msg.Text == "готово")
-                        {
-                            _productSessions[chatId].AddMoreMedia = false;
-                            _productSessions[chatId].State = await _productService.AddProduct(botClient,
-                                chatId,
-                                _productSessions[chatId].CategoryId,
-                                _productSessions[chatId].ProductName,
-                                _productSessions[chatId].Price,
-                                _productSessions[chatId].ProductDescription,
-                                _productSessions[chatId].MediaUrls,
-                                _productSessions[chatId].AddMoreMedia,
-                                cancellationToken);
-                            _productSessions.Remove(chatId);
-                            return true;
-                        }
-
-                        if (msg.Type != MessageType.Photo && msg.Type != MessageType.Video && string.IsNullOrEmpty(msg.Text))
-                        {
-                            _logger.LogWarning("Ви скинули не фото/відео");
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "ви скинули не фото/відео");
-                            return true;
-                        }
-
-                        if (msg.Photo == null || _productSessions[chatId].MediaUrls.Count() >= 5)
-                        {
-                            _productSessions[chatId].MediaUrls.RemoveRange(5, _productSessions[chatId].MediaUrls.Count() - 5);
-                            _productSessions[chatId].AddMoreMedia = false;
-                        }
-
-                        _productSessions[chatId].MediaUrls.Add(await SavePhoto(botClient, msg, chatId, cancellationToken));
-
-                        _productSessions[chatId].State = await _productService.AddProduct(botClient,
-                                chatId,
-                                _productSessions[chatId].CategoryId,
-                                _productSessions[chatId].ProductName,
-                                _productSessions[chatId].Price,
-                                _productSessions[chatId].ProductDescription,
-                                _productSessions[chatId].MediaUrls,
-                                _productSessions[chatId].AddMoreMedia,
-                                cancellationToken);
-
-                        return true;
-                    /*Update*/
-
-                    case ProductSessionState.WaitingForProductNameUpdate:
-                        if (msg.Text == "назад")
-                        {
-                            _productSessions[chatId].State = ProductSessionState.Idle;
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Оновлення продукту скасовано");
-                            return true;
-                        }
-                        _productSessions[chatId].ProductName = msg.Text ?? "";
-                        _productSessions[chatId].State = await _productService.UpdateProduct(botClient,
-                            chatId,
-                            _productSessions[chatId].ProductId,
-                            _productSessions[chatId].ProductName,
-                            _productSessions[chatId].Price,
-                            _productSessions[chatId].ProductDescription,
-                            _productSessions[chatId].MediaUrls,
-                            _productSessions[chatId].AddMoreMedia,
-                            cancellationToken);
-                        return true;
-
-                    case ProductSessionState.WaitingForPriceUpdate:
-                        if (msg.Text == "назад")
-                        {
-                            _productSessions[chatId].State = ProductSessionState.Idle;
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Оновлення продукту скасовано");
-                            return true;
-                        }
-                        if (!decimal.TryParse(msg.Text, out var updatePrice))
-                        {
-                            await botClient.SendMessage(chatId, "Ціна повинна бути числом", cancellationToken: cancellationToken);
-                            return true;
-                        }
-                        _productSessions[chatId].Price = updatePrice;
-                        _productSessions[chatId].State = await _productService.UpdateProduct(botClient,
-                            chatId,
-                            _productSessions[chatId].ProductId,
-                            _productSessions[chatId].ProductName,
-                            _productSessions[chatId].Price,
-                            _productSessions[chatId].ProductDescription,
-                            _productSessions[chatId].MediaUrls,
-                            _productSessions[chatId].AddMoreMedia,
-                            cancellationToken);
-                        return true;
-
-                    case ProductSessionState.WaitingForDescriptionUpdate:
-                        if (msg.Text == "назад")
-                        {
-                            _productSessions[chatId].State = ProductSessionState.Idle;
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Оновлення продукту скасовано");
-                            return true;
-                        }
-                        _productSessions[chatId].ProductDescription = msg.Text ?? "";
-                        _productSessions[chatId].State = await _productService.UpdateProduct(botClient,
-                            chatId,
-                            _productSessions[chatId].ProductId,
-                            _productSessions[chatId].ProductName,
-                            _productSessions[chatId].Price,
-                            _productSessions[chatId].ProductDescription,
-                            _productSessions[chatId].MediaUrls,
-                            _productSessions[chatId].AddMoreMedia,
-                            cancellationToken);
-                        return true;
-
-                    case ProductSessionState.WaitingForMediaUpdate:
-                        if (msg.Text == "назад")
-                        {
-                            _productSessions[chatId].State = ProductSessionState.Idle;
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Оновлення продукту скасовано");
-                            return true;
-                        }
-
-                        if (msg.Text == "надіслати фото заново")
-                        {
-                            _logger.LogInformation("Повторне надсилання фото/відео");
-                            _productSessions[chatId].MediaUrls.Clear();
-                            _productSessions[chatId].State = await _productService.UpdateProduct(botClient,
-                                chatId,
-                                _productSessions[chatId].ProductId,
-                                _productSessions[chatId].ProductName,
-                                _productSessions[chatId].Price,
-                                _productSessions[chatId].ProductDescription,
-                                _productSessions[chatId].MediaUrls,
-                                _productSessions[chatId].AddMoreMedia,
-                                cancellationToken);
-                            return true;
-                        }
-
-                        if (msg.Text == "готово")
-                        {
-                            _productSessions[chatId].AddMoreMedia = false;
-                            _productSessions[chatId].State = await _productService.UpdateProduct(botClient,
-                                chatId,
-                                _productSessions[chatId].ProductId,
-                                _productSessions[chatId].ProductName,
-                                _productSessions[chatId].Price,
-                                _productSessions[chatId].ProductDescription,
-                                _productSessions[chatId].MediaUrls,
-                                _productSessions[chatId].AddMoreMedia,
-                                cancellationToken);
-                            _productSessions.Remove(chatId);
-                            return true;
-                        }
-
-                        if (msg.Type != MessageType.Photo && msg.Type != MessageType.Video && string.IsNullOrEmpty(msg.Text))
-                        {
-                            _logger.LogWarning("Ви скинули не фото/відео");
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "ви скинули не фото/відео");
-                            return true;
-                        }
-
-                        if (msg.Photo == null || _productSessions[chatId].MediaUrls.Count() >= 5)
-                        {
-                            _productSessions[chatId].MediaUrls.RemoveRange(5, _productSessions[chatId].MediaUrls.Count() - 5);
-                            _productSessions[chatId].AddMoreMedia = false;
-                        }
-
-                        _productSessions[chatId].MediaUrls.Add(await SavePhoto(botClient, msg, chatId, cancellationToken));
-
-                        _productSessions[chatId].State = await _productService.UpdateProduct(botClient,
-                                chatId,
-                                _productSessions[chatId].ProductId,
-                                _productSessions[chatId].ProductName,
-                                _productSessions[chatId].Price,
-                                _productSessions[chatId].ProductDescription,
-                                _productSessions[chatId].MediaUrls,
-                                _productSessions[chatId].AddMoreMedia,
-                                cancellationToken);
-
-                        return true;
-                }
-            }
-            else
-            {
-                if (await HandleProductCommand(botClient, msg, chatId, _productSessions[chatId], cancellationToken))
-                    return true;
-            }
-            return false;
-
-        }
-
-        private async Task<string> SavePhoto(ITelegramBotClient botClient, Message msg, long chatId, CancellationToken cancellationToken)
-        {
-            if (msg == null)
-            {
-                _logger.LogWarning("Пусте повідомлення.");
-                return "";
-            }
-
-            if (msg.Photo == null && msg.Video == null)
-            {
-                _logger.LogWarning("Повідомлення не містить фото/відео.");
-                await botClient.SendMessage(chatId, "Повідомлення не містить фото/відео.", cancellationToken: cancellationToken);
-                return "";
-            }
-
-            if (msg.Photo == null)
-                _logger.LogWarning("Повідомлення не містить фото.");
-
-            else
-                return msg.Photo.Last().FileId;
-                
-            if(msg.Video == null)
-                _logger.LogWarning("Повідомлення не містить відео.");
-
-            else
-                return msg.Video.FileId;
-
-            return "";
-        }
-
-        private async Task<bool> HandleProductCommand(ITelegramBotClient botClient,
-            Message command,
-            long chatId,
-            ProductSession productSession,
-            CancellationToken cancellationToken)
-        {
-            if (string.IsNullOrEmpty(command.Text))
-            {
-                _logger.LogWarning("Пуста команда.");
-                return false;
-            }
-
-            switch (command.Text.ToLower())
-            {
-                case "мої оголошення":
-                    await _productService.GetProducts(botClient, chatId, cancellationToken);
-                    await _myProductKeyboard.SendMyProductKeyboard(botClient, chatId, cancellationToken);
-                    break;
-                case "додати продукт":
-                    _productSessions[chatId].State = await _productService.AddProduct(botClient,
-                        chatId,
-                        _productSessions[chatId].CategoryId,
-                        _productSessions[chatId].ProductName,
-                        _productSessions[chatId].Price,
-                        _productSessions[chatId].ProductDescription,
-                        _productSessions[chatId].MediaUrls,
-                        _productSessions[chatId].AddMoreMedia,
-                        cancellationToken);
-                    break;
-
-                default:
-                    return false;
-            }
-            return true;
-        }
+        
 
         private async Task OnCallbackQuery(ITelegramBotClient botClient, CallbackQuery callbackQuery, CancellationToken cancellationToken)
         {
@@ -639,7 +193,7 @@ namespace Flickoo.Telegram
             }
             else if (splitData[0] == "like")
             {
-                await _productService.LikeProduct(botClient,
+                await _favouriteService.AddToFavouriteProduct(botClient,
                     chatId,
                     int.Parse(splitData[1]),
                     cancellationToken);
@@ -649,12 +203,12 @@ namespace Flickoo.Telegram
             {
                 if(splitData[1] == "new")
                 {
-                    _productSessions[chatId].ProductsQueue = await _productService.GetLikedProducts(botClient, chatId, "FirstNew", cancellationToken);
+                    _productSessions[chatId].ProductsQueue = await _favouriteService.GetFavouriteProducts(botClient, chatId, "FirstNew", cancellationToken);
                     await SendNextLikedProduct(botClient, chatId, cancellationToken);
                 }
                 else if (splitData[1] == "old")
                 {
-                    _productSessions[chatId].ProductsQueue = await _productService.GetLikedProducts(botClient, chatId, "FirstOld", cancellationToken);
+                    _productSessions[chatId].ProductsQueue = await _favouriteService.GetFavouriteProducts(botClient, chatId, "FirstOld", cancellationToken);
                     await SendNextLikedProduct(botClient, chatId, cancellationToken);
                 }
             }
@@ -665,7 +219,7 @@ namespace Flickoo.Telegram
             }
             else if (splitData[0] == "dislike")
             {
-                await _productService.DislikeProduct(botClient,
+                await _favouriteService.DislikeProduct(botClient,
                     chatId,
                     int.Parse(splitData[1]),
                     cancellationToken);
@@ -673,20 +227,7 @@ namespace Flickoo.Telegram
             }
             else if (splitData[0] == "update")
             {
-                if (!_productSessions.ContainsKey(chatId))
-                {
-                    _productSessions[chatId] = new ProductSession();
-                }
-                _productSessions[chatId].ProductId = int.Parse(splitData[1]);
-                _productSessions[chatId].State = await _productService.UpdateProduct(botClient,
-                    chatId,
-                    _productSessions[chatId].ProductId,
-                    _productSessions[chatId].ProductName,
-                    _productSessions[chatId].Price,
-                    _productSessions[chatId].ProductDescription,
-                    _productSessions[chatId].MediaUrls,
-                    _productSessions[chatId].AddMoreMedia,
-                    cancellationToken);
+                await _productSessionService.UpdateProduct(botClient, callbackQuery.Message, chatId, int.Parse(splitData[1]), ProductSessionState, cancellationToken);
             }
             else if (splitData[0] == "delete")
             {
@@ -795,14 +336,9 @@ namespace Flickoo.Telegram
                 InlineKeyboardButton.WithCallbackData("👎 Дизлайк", $"dislike_{product.Id}")
             });
 
-            var mediaList = new List<IAlbumInputMedia>();
-            foreach (var media in product.MediaUrls)
-            {
-                if (media != null)
-                    mediaList.Add(new InputMediaPhoto(media));
-            }
+            var mediaList = await _mediaService.GetMediaGroup(botClient, product.MediaUrls, cancellationToken);
 
-            if (mediaList.Count > 0)
+            if (mediaList.Count() > 0)
             {
                 await botClient.SendMediaGroup(
                     chatId: chatId,
