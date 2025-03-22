@@ -86,17 +86,20 @@ namespace Flickoo.Telegram
         {
             var chatId = msg.Chat.Id;
             var userName = msg.From?.Username ?? "Unknown";
+
             if (msg.Photo != null)
-            {
                 _logger.LogInformation($"Отримано фото | ChatId: {chatId} | UserName: {userName} | Time: {DateTime.UtcNow}");
-            }
+
+            else if (msg.Type ==  MessageType.Text)
+                _logger.LogInformation($"Отримано повiдомлення: {msg.Text} | ChatId: {chatId} | UserName: {userName} | Time: {DateTime.UtcNow}");
+
             else if (string.IsNullOrEmpty(msg.Text) && (msg.Type != MessageType.Photo || msg.Type != MessageType.Video))
             {
                 _logger.LogWarning("Повідомлення не може бути пустим.");
                 await botClient.SendMessage(chatId, "Повідомлення не може бути пустим.", cancellationToken: cancellationToken);
                 return;
             }
-            _logger.LogInformation($"Отримано повiдомлення: {msg.Text} | ChatId: {chatId} | UserName: {userName} | Time: {DateTime.UtcNow}");
+            await _userService.AddUnRegisteredUser(botClient, chatId, userName, cancellationToken);
 
             if (await HandleBaseCommand(botClient, chatId, msg, cancellationToken))
                 return;
@@ -113,6 +116,8 @@ namespace Flickoo.Telegram
 
 
         }
+
+        
 
         private async Task<bool> HandleBaseCommand(ITelegramBotClient botClient,
             long chatId,
@@ -628,7 +633,11 @@ namespace Flickoo.Telegram
 
             var splitData = callbackQuery.Data.Split("_");
 
-            if (splitData[0] == "like")
+            if (splitData[0] == "next")
+            {
+                await SendNextLikedProduct(botClient, chatId, cancellationToken);
+            }
+            else if (splitData[0] == "like")
             {
                 await _productService.LikeProduct(botClient,
                     chatId,
@@ -640,18 +649,19 @@ namespace Flickoo.Telegram
             {
                 if(splitData[1] == "new")
                 {
-                    _productSessions[chatId].ProductsQueue = await _productService.GetLikedProducts(botClient, chatId, cancellationToken);
+                    _productSessions[chatId].ProductsQueue = await _productService.GetLikedProducts(botClient, chatId, "FirstNew", cancellationToken);
                     await SendNextLikedProduct(botClient, chatId, cancellationToken);
                 }
                 else if (splitData[1] == "old")
                 {
-                    _productSessions[chatId].ProductsQueue = await _productService.GetLikedProducts(botClient, chatId, cancellationToken);
+                    _productSessions[chatId].ProductsQueue = await _productService.GetLikedProducts(botClient, chatId, "FirstOld", cancellationToken);
                     await SendNextLikedProduct(botClient, chatId, cancellationToken);
                 }
             }
             else if (splitData[0] == "write")
             {
                 await botClient.SendMessage(chatId, "Вибачте, ця функція ще не реалізована", cancellationToken: cancellationToken);
+                return;
             }
             else if (splitData[0] == "dislike")
             {
@@ -710,7 +720,6 @@ namespace Flickoo.Telegram
                         return;
 
                     case ProductSessionState.SwapingLikedProducts:
-                        _productSessions[chatId].ProductsQueue = await _productService.GetLikedProducts(botClient, chatId, cancellationToken);
                         await SendNextLikedProduct(botClient, chatId, cancellationToken);
                         return;
 
@@ -727,13 +736,14 @@ namespace Flickoo.Telegram
         {
             if (!_productSessions.ContainsKey(chatId) || _productSessions[chatId].ProductsQueue.Count == 0)
             {
-                await botClient.SendMessage(chatId, "Ви не вподобали жодного товару.", cancellationToken: cancellationToken);
+                await botClient.SendMessage(chatId, "Вподобаних товарів немає", cancellationToken: cancellationToken);
                 return;
             }
             var product = _productSessions[chatId].ProductsQueue.Dequeue();
             var inlineKeyboard = new InlineKeyboardMarkup(new[]
             {
-                InlineKeyboardButton.WithCallbackData("напиcати продавцю", $"Write_{product}"),
+                InlineKeyboardButton.WithCallbackData("наступний продукт", $"next"),
+                InlineKeyboardButton.WithCallbackData("напиcати продавцю", $"write_{product}"),
                 InlineKeyboardButton.WithCallbackData("👎 Дизлайк", $"dislike_{product.Id}")
             });
             var mediaList = new List<IAlbumInputMedia>();

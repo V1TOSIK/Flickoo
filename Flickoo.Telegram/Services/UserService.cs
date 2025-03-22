@@ -98,6 +98,59 @@ namespace Flickoo.Telegram.Services
                 cancellationToken: cancellationToken);
         }
 
+
+        public async Task<bool> AddUnRegisteredUser(ITelegramBotClient botClient,
+            long chatId,
+            string name,
+            CancellationToken cancellationToken)
+        {
+
+            if (chatId == 0)
+            {
+                _logger.LogError("Не вдалося отримати chatId");
+                return false;
+            }
+            var user = new CreateOrUpdateUserRequest();
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                user = new CreateOrUpdateUserRequest
+                {
+                    Id = chatId,
+                    LocationName = "",
+                    Registered = false
+                };
+            }
+            else
+            {
+                user = new CreateOrUpdateUserRequest
+                {
+                    Id = chatId,
+                    Username = name,
+                    LocationName = "",
+                    Registered = false
+                };
+            }
+
+            var response = await _httpClient.PostAsJsonAsync("https://localhost:8443/api/User", user, cancellationToken: cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                // не працює
+                if (response.Content.ReadAsStringAsync().Result == "userExist")
+                {
+                    _logger.LogInformation($"User with Id:{chatId} already exists");
+                    return true;
+                }
+                _logger.LogInformation($"Added unregistered user with Id:{chatId} | UserName: {name} | Location: {null}");
+                return true;
+            }
+            else
+            {
+                var errorDetails = await response.Content.ReadAsStringAsync(cancellationToken: cancellationToken);
+                _logger.LogError($"User add error: {response.StatusCode} - {errorDetails}");
+                return false;
+            }
+        }
+
         public async Task<UserSessionState> CreateAccount(ITelegramBotClient botClient,
             long chatId,
             string? userName,
@@ -122,7 +175,8 @@ namespace Flickoo.Telegram.Services
             {
                 Id = id,
                 Username = userName,
-                LocationName = locationName
+                LocationName = locationName,
+                Registered = true
             };
 
             var response = await _httpClient.PostAsJsonAsync("https://localhost:8443/api/User", user, cancellationToken: cancellationToken);

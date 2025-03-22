@@ -2,7 +2,6 @@
 using Flickoo.Api.DTOs;
 using Flickoo.Api.Entities;
 using Flickoo.Api.Interfaces;
-using Flickoo.Api.Repositories;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -60,11 +59,47 @@ namespace Flickoo.Api.Controllers
             return Ok(productResponse);
         }
 
-        [HttpGet("liked/{userId}")]
-        public async Task<ActionResult<ICollection<ProductResponse>>> GetLikedProduct([FromRoute]long userId)
+        [HttpGet("liked/{userId}/{filter}")]
+        public async Task<ActionResult<ICollection<ProductResponse>>> GetLikedProduct([FromRoute] long userId, [FromRoute] string filter)
         {
+            if (userId == 0)
+                return BadRequest();
 
-            return Ok();
+            if (!await _dbContext.Users.AnyAsync(u => u.Id == userId))
+                return NotFound();
+
+
+            var query = await _dbContext.Likes
+                .AsNoTracking()
+                .Where(l => l.UserId == userId)
+                .Include(l => l.Product)
+                    .ThenInclude(p => p.Category)
+                .Include(l => l.Product.MediaUrls)
+                .ToListAsync();
+
+            if (filter == "FirstNew")
+                query = query.OrderByDescending(l => l.Product.CreatedAt).ToList();
+
+            else if (filter == "FirstOld")
+                query = query.OrderBy(l => l.Product.CreatedAt).ToList();
+
+            else
+                return BadRequest();
+
+            var likedProducts = query
+                .Select(l => l.Product)
+                .ToList();
+
+            var productResponse = likedProducts.Select(p => new ProductResponse()
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Price = p.Price,
+                    Description = p.Description,
+                    CategoryName = p.Category?.Name ?? "",
+                    MediaUrls = p.MediaUrls?.Select(m => m?.Url).ToList() ?? []
+                }).ToList();
+            return Ok(productResponse);
         }
 
         [HttpGet("bycategory/{categoryid}")]
@@ -146,7 +181,7 @@ namespace Flickoo.Api.Controllers
         }
 
         [HttpPost("like/{productId}/user/{userId}")]
-        public async Task<ActionResult> Like([FromRoute] long productId, [FromRoute] long userId)
+        public async Task<ActionResult> PostLike([FromRoute] long productId, [FromRoute] long userId)
         {
             var productExists = await _dbContext.Products.FirstOrDefaultAsync(p => p.Id == productId);
 

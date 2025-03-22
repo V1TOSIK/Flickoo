@@ -15,9 +15,9 @@ namespace Flickoo.Api.Controllers
         {
             _dBContext = dBContext;
         }
-        
+
         [HttpGet("{id}")]
-        public async Task<ActionResult<User>> Get([FromRoute] long id)
+        public async Task<ActionResult<User>> GetUserById([FromRoute] long id)
         {
             var findUser = await _dBContext.Users
                 .AsNoTracking()
@@ -41,8 +41,8 @@ namespace Flickoo.Api.Controllers
         {
             if (id == 0) return BadRequest("Id is not valid");
 
-            var userExists = await _dBContext.Users.AnyAsync(u => u.Id == id);
-            
+            var userExists = await _dBContext.Users.AnyAsync(u => u.Id == id && u.Registered == true);
+
             return Ok(userExists);
         }
 
@@ -56,16 +56,27 @@ namespace Flickoo.Api.Controllers
                 .ToListAsync();
             return Ok(productList);
         }
-        
+
         [HttpPost]
-        public async Task<ActionResult> Post([FromBody] CreateOrUpdateUserRequest request)
+        public async Task<ActionResult<string>> Post([FromBody] CreateOrUpdateUserRequest request)
         {
-            long locationId;
+            if (request.Id == 0)
+                return BadRequest("Id is not valid");
+
+            var userExists = await _dBContext.Users.AnyAsync(u => u.Id == request.Id);
+
+            if (userExists)
+                return Ok("userExist");
+
+            if (string.IsNullOrEmpty(request.Username))
+                return BadRequest("Username is null or empty");
+
             var locationExists = await _dBContext.Locations
                 .FirstOrDefaultAsync(l => l.Name == request.LocationName);
 
+            long locationId;
             if (locationExists == null)
-            { 
+            {
                 var newLocation = new Location
                 {
                     Name = request.LocationName
@@ -79,25 +90,67 @@ namespace Flickoo.Api.Controllers
                 locationId = locationExists.Id;
             }
 
-            if (string.IsNullOrEmpty(request.Username))
-                return BadRequest("Username is null or empty");
 
-            if (await _dBContext.Users.AnyAsync(u => u.Id == request.Id))
-                return BadRequest("User with this id already exists.");
-
-            var newUser = new User
+            if (!userExists)
             {
-                Id = request.Id,
-                Username = request.Username,
-                LocationId = locationId,
-            };
+                var newUnRegisteredUser = new User
+                {
+                    Id = request.Id,
+                    Username = request.Username,
+                    LocationId = locationId,
+                    Registered = false
+                };
+                await _dBContext.Users.AddAsync(newUnRegisteredUser);
+                await _dBContext.SaveChangesAsync();
+                return Ok($"OK, user with name: {newUnRegisteredUser.Username} and id: {newUnRegisteredUser.Id} was added to notRegistered");
+            }
 
-            await _dBContext.Users.AddAsync(newUser);
+            return Ok("Finish anyone check not do");
+
+        }
+
+        [HttpPost("register")]
+        public async Task<ActionResult> Register([FromBody] CreateOrUpdateUserRequest request)
+        {
+            if (request.Id == 0)
+                return BadRequest("Id is not valid");
+
+            var userFromDb = await _dBContext.Users.FirstOrDefaultAsync(u => u.Id == request.Id);
+
+            if (userFromDb == null)
+                return NotFound("User not found");
+
+            if (userFromDb.Registered)
+                return BadRequest("User is already registered");
+
+            var locationExists = await _dBContext.Locations
+                 .FirstOrDefaultAsync(l => l.Name == request.LocationName);
+
+            long locationId;
+            if (locationExists == null)
+            {
+                var newLocation = new Location
+                {
+                    Name = request.LocationName
+                };
+                await _dBContext.Locations.AddAsync(newLocation);
+                await _dBContext.SaveChangesAsync();
+                locationId = newLocation.Id;
+            }
+            else
+            {
+                locationId = locationExists.Id;
+            }
+
+            userFromDb.Username = request.Username;
+            userFromDb.LocationId = locationId;
+            userFromDb.Registered = true;
 
             await _dBContext.SaveChangesAsync();
-
-            return Ok($"OK, user with name: {newUser.Username} and id: {newUser.Id} was added");
+            return Ok();
         }
+
+
 
         [HttpPut("{id}")]
         public async Task<ActionResult> Put([FromBody] CreateOrUpdateUserRequest updateUser)
@@ -137,15 +190,6 @@ namespace Flickoo.Api.Controllers
             await _dBContext.SaveChangesAsync();
             return Ok();
         }
-            /*
-            await _dBContext.Users
-                .Include(u => u.Location)
-                .Where(u => u.Id == updateUser.Id)
-                .ExecuteUpdateAsync(u => u
-                    .SetProperty(user => user.Username, updateUser.Username)
-                    .SetProperty(user => user.LocationId, userExists.LocationId)
-                );
-                */
 
         [HttpDelete("{id}")]
         public async Task<ActionResult> Delete(long id)

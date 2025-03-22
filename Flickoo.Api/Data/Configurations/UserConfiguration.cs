@@ -12,6 +12,7 @@ namespace Flickoo.Api.Data.Configurations
             builder.Property(u => u.Id).HasColumnName("UserId");
             builder.Property(u => u.Username).IsRequired();
             builder.Property(u => u.CreatedAt).IsRequired();
+            builder.Property(u => u.Registered).IsRequired();
             builder.HasOne(u => u.Location)
                 .WithMany(l => l.Users)
                 .HasForeignKey(u => u.LocationId)

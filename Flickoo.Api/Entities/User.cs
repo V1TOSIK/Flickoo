@@ -9,6 +9,7 @@
         public long Id { get; set; }
         public string Username { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
+        public bool Registered { get; set; }
 
         public long LocationId { get; set; }
         public Location Location { get; set; }

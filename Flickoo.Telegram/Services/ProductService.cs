@@ -360,16 +360,17 @@ namespace Flickoo.Telegram.Services
 
         public async Task<Queue<GetProductResponse>> GetLikedProducts(ITelegramBotClient botClient,
             long chatId,
+            string filter,
             CancellationToken cancellationToken)
         {
-            var response = await _httpClient.GetAsync($"https://localhost:8443/api/Product/liked/{chatId}", cancellationToken);
+            var response = await _httpClient.GetAsync($"https://localhost:8443/api/Product/liked/{chatId}/{filter}", cancellationToken);
             if (response.IsSuccessStatusCode)
             {
                 var products = await response.Content.ReadFromJsonAsync<Queue<GetProductResponse>>(cancellationToken: cancellationToken);
                 if (products == null || products.Count() == 0)
                 {
-                    await botClient.SendMessage(chatId, "Ви ще не лайкнули жодного продукту", cancellationToken: cancellationToken);
-                    _logger.LogWarning("Користувач ще не лайкнув жодного продукту");
+                    await botClient.SendMessage(chatId, "Кінець списку", cancellationToken: cancellationToken);
+                    _logger.LogWarning("Лайкнуті продукти закінчилися");
                 }
                 else
                 {

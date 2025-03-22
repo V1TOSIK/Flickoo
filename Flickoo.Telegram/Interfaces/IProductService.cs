@@ -52,6 +52,7 @@ namespace Flickoo.Telegram.Interfaces
 
         Task<Queue<GetProductResponse>> GetLikedProducts(ITelegramBotClient botClient,
             long chatId,
+            string filter,
             CancellationToken cancellationToken);
     }
 }
