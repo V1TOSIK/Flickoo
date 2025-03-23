@@ -1,36 +1,25 @@
-﻿using System.Net.Http.Json;
-using System.Reflection.Metadata.Ecma335;
-using System.Runtime.ExceptionServices;
-using Flickoo.Telegram.DTOs;
+﻿using Flickoo.Telegram.DTOs;
 using Flickoo.Telegram.enums;
 using Flickoo.Telegram.Interfaces;
 using Flickoo.Telegram.Keyboards;
-using Flickoo.Telegram.SessionModels;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using Telegram.Bot.Types.ReplyMarkups;
 
 namespace Flickoo.Telegram
 {
     public class TelegramBotService : BackgroundService
     {
         private readonly ITelegramBotClient _botClient;
-        private readonly HttpClient _httpClient;
         private readonly ILogger<TelegramBotService> _logger;
         private readonly IUserService _userService;
         private readonly IProductService _productService;
-        private readonly IMediaService _mediaService;
         private readonly IFavouriteService _favouriteService;
         private readonly IUserSessionService _userSessionService;
         private readonly IProductSessionService _productSessionService;
         private readonly MainKeyboard _mainKeyboard;
-        private readonly MyProductKeyboard _myProductKeyboard;
-        private readonly CategoriesInlineKeyboard _categoriesInlineKeyboard;
-        private readonly LikeInlineKeyboard _likeInlineKeyboard;
-        private Queue<GetProductResponse> _productsForSwaping = [];
 
         public TelegramBotService(
             ITelegramBotClient botClient,
@@ -48,18 +37,13 @@ namespace Flickoo.Telegram
             LikeInlineKeyboard likeInlineKeyboard)
         {
             _botClient = botClient;
-            _httpClient = httpClient;
             _logger = logger;
             _userService = userService;
             _productService = productService;
-            _mediaService = mediaService;
             _favouriteService = favouriteService;
             _userSessionService = userSessionService;
             _productSessionService = productSessionService;
             _mainKeyboard = mainKeyboard;
-            _myProductKeyboard = myProductKeyboard;
-            _categoriesInlineKeyboard = categoriesInlineKeyboard;
-            _likeInlineKeyboard = likeInlineKeyboard;
         }
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -136,23 +120,6 @@ namespace Flickoo.Telegram
             }
             switch (command.Text.ToLower())
             {
-                case "вподобане":
-                    if (!_productSessions.ContainsKey(chatId))
-                        _productSessions[chatId] = new ProductSession();
-                    _productSessions[chatId].State = ProductSessionState.SwapingLikedProducts;
-                    var likeKeyboard = _likeInlineKeyboard.SendLikeInlineButtonsAsync(botClient, chatId, cancellationToken: cancellationToken);
-                    await botClient.SendMessage(chatId, "Оберіть спосіб сортування", cancellationToken: cancellationToken, replyMarkup: likeKeyboard);
-                    return true;
-
-
-                case "🚀":
-                    if (!_productSessions.ContainsKey(chatId))
-                        _productSessions[chatId] = new ProductSession();
-                    _productSessions[chatId].State = ProductSessionState.AwaitCategoryForSwaping;
-                    var keyboard = await _categoriesInlineKeyboard.SendInlineButtonsAsync(_httpClient, botClient, chatId, cancellationToken);
-                    await botClient.SendMessage(chatId, "Оберіть категорію", cancellationToken: cancellationToken, replyMarkup: keyboard);
-                    return true;
-
                 case "назад":
                     await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Дію скасовано");
                     return true;
@@ -189,7 +156,7 @@ namespace Flickoo.Telegram
 
             if (splitData[0] == "next")
             {
-                await SendNextLikedProduct(botClient, chatId, cancellationToken);
+                await _productSessionService.SendNextLikedProduct(botClient, chatId, cancellationToken);
             }
             else if (splitData[0] == "like")
             {
@@ -197,19 +164,20 @@ namespace Flickoo.Telegram
                     chatId,
                     int.Parse(splitData[1]),
                     cancellationToken);
-                await SendNextProduct(botClient, chatId, cancellationToken);
+                await _productSessionService.SendNextProduct(botClient, chatId, cancellationToken);
             }
             else if (splitData[0] == "first")
             {
-                if(splitData[1] == "new")
+                var session = _productSessionService.GetProductSession(chatId);
+                if (splitData[1] == "new")
                 {
-                    _productSessions[chatId].ProductsQueue = await _favouriteService.GetFavouriteProducts(botClient, chatId, "FirstNew", cancellationToken);
-                    await SendNextLikedProduct(botClient, chatId, cancellationToken);
+                    session.ProductsQueue = await _favouriteService.GetFavouriteProducts(botClient, chatId, "FirstNew", cancellationToken);
+                    await _productSessionService.SendNextLikedProduct(botClient, chatId, cancellationToken);
                 }
                 else if (splitData[1] == "old")
                 {
-                    _productSessions[chatId].ProductsQueue = await _favouriteService.GetFavouriteProducts(botClient, chatId, "FirstOld", cancellationToken);
-                    await SendNextLikedProduct(botClient, chatId, cancellationToken);
+                    session.ProductsQueue = await _favouriteService.GetFavouriteProducts(botClient, chatId, "FirstOld", cancellationToken);
+                    await _productSessionService.SendNextLikedProduct(botClient, chatId, cancellationToken);
                 }
             }
             else if (splitData[0] == "write")
@@ -223,11 +191,11 @@ namespace Flickoo.Telegram
                     chatId,
                     int.Parse(splitData[1]),
                     cancellationToken);
-                await SendNextProduct(botClient, chatId, cancellationToken);
+                await _productSessionService.SendNextProduct(botClient, chatId, cancellationToken);
             }
             else if (splitData[0] == "update")
             {
-                await _productSessionService.UpdateProduct(botClient, callbackQuery.Message, chatId, int.Parse(splitData[1]), ProductSessionState, cancellationToken);
+                await _productSessionService.UpdateProduct(botClient, callbackQuery.Message, chatId, int.Parse(splitData[1]), cancellationToken);
             }
             else if (splitData[0] == "delete")
             {
@@ -235,136 +203,40 @@ namespace Flickoo.Telegram
             }
             else
             {
-                switch (_productSessions[chatId].State)
+                var session = _productSessionService.GetProductSession(chatId);
+                switch (session.State)
                 {
                     case ProductSessionState.WaitingForCategory:
-                        _productSessions[chatId].CategoryId = int.Parse(callbackQuery.Data);
-                        _productSessions[chatId].State = await _productService.AddProduct(botClient,
+                        session.CategoryId = int.Parse(callbackQuery.Data);
+                        session.State = await _productService.AddProduct(botClient,
                             chatId,
-                            _productSessions[chatId].CategoryId,
-                            _productSessions[chatId].ProductName,
-                            _productSessions[chatId].Price,
-                            _productSessions[chatId].ProductDescription,
-                            _productSessions[chatId].MediaUrls,
-                            _productSessions[chatId].AddMoreMedia,
+                            session.CategoryId,
+                            session.ProductName,
+                            session.Price,
+                            session.ProductDescription,
+                            session.MediaUrls,
+                            session.AddMoreMedia,
                             cancellationToken);
                         break;
 
                     case ProductSessionState.AwaitCategoryForSwaping:
 
-                        if (!_productSessions.ContainsKey(chatId))
-                            _productSessions[chatId] = new ProductSession();
+                        session.ProductsQueue = await _productService.GetProductsForSwaping(botClient, chatId, int.Parse(callbackQuery.Data), cancellationToken);
 
-                        _productSessions[chatId].ProductsQueue = await _productService.GetProductsForSwaping(botClient, chatId, int.Parse(callbackQuery.Data), cancellationToken);
-
-                        await SendNextProduct(botClient, chatId, cancellationToken);
+                        await _productSessionService.SendNextProduct(botClient, chatId, cancellationToken);
                         return;
 
                     case ProductSessionState.SwapingLikedProducts:
-                        await SendNextLikedProduct(botClient, chatId, cancellationToken);
+                        await _productSessionService.SendNextLikedProduct(botClient, chatId, cancellationToken);
                         return;
 
                     default:
-                        _productSessions[chatId].State = ProductSessionState.Idle;
+                        session.State = ProductSessionState.Idle;
                         return;
                 }
 
             }
             return;
-        }
-
-        private async Task SendNextLikedProduct(ITelegramBotClient botClient, long chatId, CancellationToken cancellationToken)
-        {
-            if (!_productSessions.ContainsKey(chatId) || _productSessions[chatId].ProductsQueue.Count == 0)
-            {
-                await botClient.SendMessage(chatId, "Вподобаних товарів немає", cancellationToken: cancellationToken);
-                return;
-            }
-            var product = _productSessions[chatId].ProductsQueue.Dequeue();
-            var inlineKeyboard = new InlineKeyboardMarkup(new[]
-            {
-                InlineKeyboardButton.WithCallbackData("наступний продукт", $"next"),
-                InlineKeyboardButton.WithCallbackData("напиcати продавцю", $"write_{product}"),
-                InlineKeyboardButton.WithCallbackData("👎 Дизлайк", $"dislike_{product.Id}")
-            });
-            var mediaList = new List<IAlbumInputMedia>();
-            foreach (var media in product.MediaUrls)
-            {
-                if (media != null)
-                    mediaList.Add(new InputMediaPhoto(media));
-            }
-            if (mediaList.Count > 0)
-            {
-                await botClient.SendMediaGroup(
-                    chatId: chatId,
-                    mediaList,
-                    cancellationToken: cancellationToken
-                );
-                await botClient.SendMessage(chatId,
-                $"Назва: {product.Name}\n" +
-                $"Ціна: {product.Price}\n\n" +
-                $"Опис: {product.Description}",
-                cancellationToken: cancellationToken,
-                replyMarkup: inlineKeyboard);
-                return;
-            }
-            else
-            {
-                await botClient.SendMessage(chatId,
-                $"Назва: {product.Name}\n" +
-                $"Ціна: {product.Price}\n\n" +
-                $"Опис: {product.Description}",
-                cancellationToken: cancellationToken,
-                replyMarkup: inlineKeyboard);
-                return;
-            }
-        }
-
-        private async Task SendNextProduct(ITelegramBotClient botClient, long chatId, CancellationToken cancellationToken)
-        {
-            if (!_productSessions.ContainsKey(chatId) || _productSessions[chatId].ProductsQueue.Count == 0)
-            {
-                await botClient.SendMessage(chatId, "Більше товарів немає.", cancellationToken: cancellationToken);
-                return;
-            }
-
-            var product = _productSessions[chatId].ProductsQueue.Dequeue();
-
-            var inlineKeyboard = new InlineKeyboardMarkup(new[]
-            {
-                InlineKeyboardButton.WithCallbackData("👍 Лайк", $"like_{product.Id}"),
-                InlineKeyboardButton.WithCallbackData("👎 Дизлайк", $"dislike_{product.Id}")
-            });
-
-            var mediaList = await _mediaService.GetMediaGroup(botClient, product.MediaUrls, cancellationToken);
-
-            if (mediaList.Count() > 0)
-            {
-                await botClient.SendMediaGroup(
-                    chatId: chatId,
-                    mediaList,
-                    cancellationToken: cancellationToken
-                );
-
-                await botClient.SendMessage(chatId,
-                $"Назва: {product.Name}\n" +
-                $"Ціна: {product.Price}\n\n" +
-                $"Опис: {product.Description}",
-                cancellationToken: cancellationToken,
-                replyMarkup: inlineKeyboard);
-                return;
-            }
-            else
-            {
-                await botClient.SendMessage(chatId,
-                $"Назва: {product.Name}\n" +
-                $"Ціна: {product.Price}\n\n" +
-                $"Опис: {product.Description}",
-                cancellationToken: cancellationToken,
-                replyMarkup: inlineKeyboard);
-                return;
-
-            }
         }
 
         private async Task UnknownUpdateHandlerAsync(ITelegramBotClient botClient, Update update)

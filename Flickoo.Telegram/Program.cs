@@ -20,6 +20,7 @@ IHost host = Host.CreateDefaultBuilder(args)
                 return new TelegramBotClient(options, httpClient);
             });
         services.AddHostedService<TelegramBotService>();
+
         services.AddSingleton<IUserService, UserService>();
         services.AddSingleton<IProductService, ProductService>();
         services.AddSingleton<IMediaService, MediaService>();

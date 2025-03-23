@@ -16,5 +16,13 @@ namespace Flickoo.Telegram.Interfaces
             long chatId,
             UserSession userSession,
             CancellationToken cancellationToken);
+
+        Task<bool> CheckUserExist(ITelegramBotClient botClient,
+            long chatId,
+            CancellationToken cancellationToken);
+
+        UserSession GetUserSession(long chatId);
+
+        void ResetSession(long chatId);
     }
 }

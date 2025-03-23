@@ -2,6 +2,7 @@
 using Telegram.Bot.Types;
 using Telegram.Bot;
 using Flickoo.Telegram.enums;
+using Flickoo.Telegram.DTOs;
 
 namespace Flickoo.Telegram.Interfaces
 {
@@ -15,14 +16,29 @@ namespace Flickoo.Telegram.Interfaces
         Task<bool> HandleProductCommand(ITelegramBotClient botClient,
             Message command,
             long chatId,
-            ProductSession productSession,
             CancellationToken cancellationToken);
 
         Task<bool> UpdateProduct(ITelegramBotClient botClient,
             Message msg,
             long chatId,
             long productId,
-            ProductSessionState productSessionState,
             CancellationToken cancellationToken);
+
+        Task SendNextLikedProduct(ITelegramBotClient botClient,
+            long chatId,
+            CancellationToken cancellationToken);
+
+        Task SendNextProduct(ITelegramBotClient botClient,
+            long chatId,
+            CancellationToken cancellationToken);
+
+        void SetProductsQueue(long chatId,
+            IEnumerable<GetProductResponse> products);
+
+        ProductSession GetProductSession(long chatId);
+
+        void ResetSession(long chatId);
+
+
     }
 }

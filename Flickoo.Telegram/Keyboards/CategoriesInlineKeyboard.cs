@@ -7,7 +7,12 @@ namespace Flickoo.Telegram.Keyboards
 {
     public class CategoriesInlineKeyboard
     {
-        public async Task<InlineKeyboardMarkup> SendInlineButtonsAsync(HttpClient _httpClient, ITelegramBotClient botClient, long chatId, CancellationToken cancellationToken)
+        private readonly HttpClient _httpClient;
+        public CategoriesInlineKeyboard(HttpClient httpClient)
+        {
+            _httpClient = httpClient;
+        }
+        public async Task<InlineKeyboardMarkup> SendInlineButtonsAsync(ITelegramBotClient botClient, long chatId, CancellationToken cancellationToken)
         {
             List<CategoryDto> categories = new();
             var response = await _httpClient.GetAsync("https://localhost:8443/api/Product/category");

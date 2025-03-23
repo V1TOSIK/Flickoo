@@ -228,14 +228,47 @@ namespace Flickoo.Telegram.Services
                 return ProductSessionState.Idle;
             }
 
+            if (string.IsNullOrEmpty(productName))
+            {
+                _logger.LogWarning("Введіть нову назву продукту");
+                await botClient.SendMessage(chatId, "Введіть назву продукту", cancellationToken: cancellationToken);
+                return ProductSessionState.WaitingForProductName;
+            }
 
-            await ProductNameCheck(botClient, chatId, productName, cancellationToken);
+            if (productPrice == null || productPrice < 1)
+            {
+                _logger.LogWarning("Введіть нову ціну(в грн)");
+                await botClient.SendMessage(chatId, "Введіть ціну", cancellationToken: cancellationToken);
+                return ProductSessionState.WaitingForPrice;
+            }
 
-            await ProductPriceCheck(botClient, chatId, productPrice, cancellationToken);
+            if (string.IsNullOrEmpty(productDescription))
+            {
+                _logger.LogWarning("Введіть новий опис продукту");
+                await botClient.SendMessage(chatId, "Введіть опис продукту", cancellationToken: cancellationToken);
+                return ProductSessionState.WaitingForDescription;
+            }
 
-            await ProductDescriptionCheck(botClient, chatId, productDescription, cancellationToken);
+            if (mediaUrl == null || mediaUrl is [])
+            {
+                _logger.LogWarning("Виберіть нові фото продукту");
+                await botClient.SendMessage(chatId, "Виберіть нові фото продукту\nПОПЕРЕДЖЕННЯ!\nOбрати можна лише 5 фото/відео", cancellationToken: cancellationToken);
+                return ProductSessionState.WaitingForMedia;
+            }
+            if (mediaUrl.Count() > 5)
+            {
+                _logger.LogWarning("Можна додати лише 5 фото/відео");
+                await botClient.SendMessage(chatId, "Можна додати лише 5 фото/відео!!!!");
+                await _addProductMediaKeyboard.SendAddProductMediaKeyboard(botClient, chatId, "Можна додати лише 5 фото/відео!!!!", cancellationToken);
+                return ProductSessionState.WaitingForMedia;
+            }
 
-            await ProductMediaCheck(botClient, chatId, mediaUrl, addMoreMedia, cancellationToken);
+            if (addMoreMedia)
+            {
+                _logger.LogInformation($"Додано {mediaUrl.Count()}/5 фото");
+                await _addProductMediaKeyboard.SendAddProductMediaKeyboard(botClient, chatId, $"Додано {mediaUrl.Count()}/5 фото", cancellationToken);
+                return ProductSessionState.WaitingForMedia;
+            }
 
             var product = new CreateOrUpdateProductRequest
             {

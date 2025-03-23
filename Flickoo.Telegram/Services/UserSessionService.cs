@@ -4,6 +4,7 @@ using Flickoo.Telegram.Keyboards;
 using Flickoo.Telegram.SessionModels;
 using Telegram.Bot.Types;
 using Telegram.Bot;
+using System.Threading;
 
 namespace Flickoo.Telegram.Services
 {
@@ -23,54 +24,67 @@ namespace Flickoo.Telegram.Services
         }
         public async Task<bool> UserSessionCheck(ITelegramBotClient botClient, long chatId, Message msg, CancellationToken cancellationToken)
         {
-            if (!_userSessions.ContainsKey(chatId))
-                _userSessions[chatId] = new UserSession();
+            var session = GetUserSession(chatId);
 
-            if (_userSessions[chatId].State != UserSessionState.Idle)
+            if (session.State != UserSessionState.Idle)
             {
-                switch (_userSessions[chatId].State)
+                switch (session.State)
                 {
                     case UserSessionState.CreateWaitingForUserName:
                         if (msg.Text == "назад")
                         {
-                            _userSessions[chatId].State = UserSessionState.Idle;
+                            session.State = UserSessionState.Idle;
+                            SetUserSession(chatId, session);
                             await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Реєстрацію скасовано");
+                            ResetSession(chatId);
                             return true;
                         }
-                        _userSessions[chatId].UserName = msg.Text ?? "";
-                        _userSessions[chatId].State = await _userService.CreateAccount(botClient, chatId, _userSessions[chatId].UserName, _userSessions[chatId].LocationName, cancellationToken);
+                        session.UserName = msg.Text ?? "";
+                        session.State = await _userService.CreateAccount(botClient, chatId, session.UserName, session.LocationName, cancellationToken);
+                        SetUserSession(chatId, session);
                         return true;
 
                     case UserSessionState.CreateWaitingForLocation:
                         if (msg.Text == "назад")
                         {
-                            _userSessions[chatId].State = UserSessionState.Idle;
+                            session.State = UserSessionState.Idle;
+                            SetUserSession(chatId, session);
                             await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Реєстрацію скасовано");
+                            ResetSession(chatId);
                             return true;
                         }
-                        _userSessions[chatId].LocationName = msg.Text ?? "";
-                        _userSessions[chatId].State = await _userService.CreateAccount(botClient, chatId, _userSessions[chatId].UserName, _userSessions[chatId].LocationName, cancellationToken);
+                        session.LocationName = msg.Text ?? "";
+                        session.State = await _userService.CreateAccount(botClient, chatId, session.UserName, session.LocationName, cancellationToken);
+                        ResetSession(chatId);
+                        SetUserSession(chatId, session);
                         return true;
 
                     case UserSessionState.UpdateWaitingForUserName:
                         if (msg.Text == "назад")
                         {
-                            _userSessions[chatId].State = UserSessionState.Idle;
+                            session.State = UserSessionState.Idle;
+                            SetUserSession(chatId, session);
                             await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Оновлення скасовано");
+                            ResetSession(chatId);
                             return true;
                         }
-                        _userSessions[chatId].UserName = msg.Text ?? "";
-                        _userSessions[chatId].State = await _userService.UpdateAccount(botClient, chatId, _userSessions[chatId].UserName, _userSessions[chatId].LocationName, cancellationToken);
+                        session.UserName = msg.Text ?? "";
+                        session.State = await _userService.UpdateAccount(botClient, chatId, session.UserName, session.LocationName, cancellationToken);
+                        SetUserSession(chatId, session);
                         return true;
                     case UserSessionState.UpdateWaitingForLocation:
                         if (msg.Text == "назад")
                         {
-                            _userSessions[chatId].State = UserSessionState.Idle;
+                            session.State = UserSessionState.Idle;
+                            SetUserSession(chatId, session);
                             await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Оновлення скасовано");
+                            ResetSession(chatId);
                             return true;
                         }
-                        _userSessions[chatId].LocationName = msg.Text ?? "";
-                        _userSessions[chatId].State = await _userService.UpdateAccount(botClient, chatId, _userSessions[chatId].UserName, _userSessions[chatId].LocationName, cancellationToken);
+                        session.LocationName = msg.Text ?? "";
+                        session.State = await _userService.UpdateAccount(botClient, chatId, session.UserName, session.LocationName, cancellationToken);
+                        ResetSession(chatId);
+                        SetUserSession(chatId, session);
                         return true;
                 }
             }
@@ -105,7 +119,7 @@ namespace Flickoo.Telegram.Services
                         cancellationToken);
 
                     if (_userSessions[chatId].State == UserSessionState.Idle)
-                        _userSessions.Remove(chatId);
+                        ResetSession(chatId);
 
                     return true;
 
@@ -116,13 +130,44 @@ namespace Flickoo.Telegram.Services
                         userSession.LocationName,
                         cancellationToken);
                     if (_userSessions[chatId].State == UserSessionState.Idle)
-                        _userSessions.Remove(chatId);
+                        ResetSession(chatId);
                     return true;
 
                 default:
                     return false;
             }
 
+        }
+        public async Task<bool> CheckUserExist(ITelegramBotClient botClient,
+            long chatId,
+            CancellationToken cancellationToken)
+        {
+            throw new NotImplementedException();
+        }
+
+        public UserSession GetUserSession(long chatId)
+        {
+            if (!_userSessions.TryGetValue(chatId, out var session))
+            {
+                session = new UserSession();
+                _userSessions[chatId] = session;
+            }
+            return session;
+        }
+
+        public UserSession SetUserSession(long chatId, UserSession userSession)
+        {
+            if (_userSessions.ContainsKey(chatId))
+                _userSessions[chatId] = userSession;
+            else
+                _userSessions.Add(chatId, userSession);
+            return userSession;
+        }
+
+        public void ResetSession(long chatId)
+        {
+            if (_userSessions.ContainsKey(chatId))
+                _userSessions.Remove(chatId);
         }
     }
 }
