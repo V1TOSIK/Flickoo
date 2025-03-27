@@ -5,7 +5,7 @@ namespace Flickoo.Telegram.Keyboards
 {
     public class MyProductKeyboard
     {
-        public async Task SendMyProductKeyboard(ITelegramBotClient botClient, long chatId, CancellationToken cancellationToken)
+        public async Task SendMyProductKeyboard(ITelegramBotClient botClient, long chatId, string text, CancellationToken cancellationToken)
         {
             var keyboard = new ReplyKeyboardMarkup(new[]
             {
@@ -16,7 +16,7 @@ namespace Flickoo.Telegram.Keyboards
                 ResizeKeyboard = true,
                 OneTimeKeyboard = false
             };
-            await botClient.SendMessage(chatId, "Оберіть потрібну команду", replyMarkup: keyboard, cancellationToken: cancellationToken);
+            await botClient.SendMessage(chatId, text, replyMarkup: keyboard, cancellationToken: cancellationToken);
         }
     }
 }

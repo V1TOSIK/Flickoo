@@ -1,9 +1,7 @@
 ﻿using Flickoo.Telegram.DTOs;
 using Flickoo.Telegram.Interfaces;
-using System.Net.Http;
 using System.Net.Http.Json;
 using Telegram.Bot;
-using Telegram.Bot.Types;
 
 namespace Flickoo.Telegram.Services
 {

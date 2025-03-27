@@ -33,10 +33,8 @@ namespace Flickoo.Telegram.Services
                     case UserSessionState.CreateWaitingForUserName:
                         if (msg.Text == "назад")
                         {
-                            session.State = UserSessionState.Idle;
-                            SetUserSession(chatId, session);
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Реєстрацію скасовано");
                             ResetSession(chatId);
+                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Реєстрацію скасовано");
                             return true;
                         }
                         session.UserName = msg.Text ?? "";
@@ -47,10 +45,8 @@ namespace Flickoo.Telegram.Services
                     case UserSessionState.CreateWaitingForLocation:
                         if (msg.Text == "назад")
                         {
-                            session.State = UserSessionState.Idle;
-                            SetUserSession(chatId, session);
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Реєстрацію скасовано");
                             ResetSession(chatId);
+                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Реєстрацію скасовано");
                             return true;
                         }
                         session.LocationName = msg.Text ?? "";
@@ -62,10 +58,8 @@ namespace Flickoo.Telegram.Services
                     case UserSessionState.UpdateWaitingForUserName:
                         if (msg.Text == "назад")
                         {
-                            session.State = UserSessionState.Idle;
-                            SetUserSession(chatId, session);
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Оновлення скасовано");
                             ResetSession(chatId);
+                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Оновлення скасовано");
                             return true;
                         }
                         session.UserName = msg.Text ?? "";
@@ -75,10 +69,8 @@ namespace Flickoo.Telegram.Services
                     case UserSessionState.UpdateWaitingForLocation:
                         if (msg.Text == "назад")
                         {
-                            session.State = UserSessionState.Idle;
-                            SetUserSession(chatId, session);
-                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Оновлення скасовано");
                             ResetSession(chatId);
+                            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Оновлення скасовано");
                             return true;
                         }
                         session.LocationName = msg.Text ?? "";
@@ -167,7 +159,14 @@ namespace Flickoo.Telegram.Services
         public void ResetSession(long chatId)
         {
             if (_userSessions.ContainsKey(chatId))
+            {
+                var session = _userSessions[chatId];
+                session.State = UserSessionState.Idle;
+                session.UserName = null;
+                session.LocationName = null;
+
                 _userSessions.Remove(chatId);
+            }
         }
     }
 }

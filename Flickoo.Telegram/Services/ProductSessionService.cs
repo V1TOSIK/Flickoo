@@ -14,7 +14,6 @@ namespace Flickoo.Telegram.Services
     {
         private readonly ILogger<ProductSessionService> _logger;
         private readonly MainKeyboard _mainKeyboard;
-        private readonly MyProductKeyboard _myProductKeyboard;
         private readonly IProductService _productService;
         private readonly IMediaService _mediaService;
         private readonly Dictionary<long, ProductSession> _productSessions = new();
@@ -23,7 +22,6 @@ namespace Flickoo.Telegram.Services
 
         public ProductSessionService(ILogger<ProductSessionService> logger,
             MainKeyboard mainKeyboard,
-            MyProductKeyboard myProductKeyboard,
             IProductService productService,
             IMediaService mediaService,
             LikeInlineKeyboard likeInlineKeyboard,
@@ -31,7 +29,6 @@ namespace Flickoo.Telegram.Services
         {
             _logger = logger;
             _mainKeyboard = mainKeyboard;
-            _myProductKeyboard = myProductKeyboard;
             _productService = productService;
             _mediaService = mediaService;   
             _likeInlineKeyboard = likeInlineKeyboard;
@@ -109,7 +106,15 @@ namespace Flickoo.Telegram.Services
                             return true;
                         }
                         session.ProductDescription = msg.Text ?? "";
-
+                        session.State = await _productService.AddProduct(botClient,
+                            chatId,
+                            session.CategoryId,
+                            session.ProductName,
+                            session.Price,
+                            session.ProductDescription,
+                            session.MediaUrls,
+                            session.AddMoreMedia,
+                            cancellationToken);
                         return true;
 
                     case ProductSessionState.WaitingForMedia:
@@ -194,13 +199,15 @@ namespace Flickoo.Telegram.Services
                             ResetSession(chatId);
                         return true;
 
+                    default:
+                        ResetSession(chatId);
+                        return false;
 
                 }
             }
             else
                 return await HandleProductCommand(botClient, msg, chatId, cancellationToken);
 
-            return false;
         }
 
 
@@ -226,7 +233,6 @@ namespace Flickoo.Telegram.Services
                     await botClient.SendMessage(chatId, "Оберіть спосіб сортування", cancellationToken: cancellationToken, replyMarkup: likeKeyboard);
                     return true;
 
-
                 case "🚀":
                     _productSessions[chatId].State = ProductSessionState.AwaitCategoryForSwaping;
                     var keyboard = await _categoriesInlineKeyboard.SendInlineButtonsAsync(botClient, chatId, cancellationToken);
@@ -235,7 +241,7 @@ namespace Flickoo.Telegram.Services
 
                 case "мої оголошення":
                     await _productService.GetUserProducts(botClient, chatId, cancellationToken);
-                    await _myProductKeyboard.SendMyProductKeyboard(botClient, chatId, cancellationToken);
+                    
                     return true;
                 case "додати продукт":
                     _productSessions[chatId].State = await _productService.AddProduct(botClient,
@@ -256,7 +262,6 @@ namespace Flickoo.Telegram.Services
                 default:
                     return false;
             }
-            return true;
         }
 
         public async Task<bool> UpdateProduct(ITelegramBotClient botClient,
@@ -319,6 +324,15 @@ namespace Flickoo.Telegram.Services
                     }
                     _productSessions[chatId].ProductDescription = msg.Text ?? "";
 
+                    _productSessions[chatId].State = await _productService.UpdateProduct(botClient,
+                            chatId,
+                            _productSessions[chatId].CategoryId,
+                            _productSessions[chatId].ProductName,
+                            _productSessions[chatId].Price,
+                            _productSessions[chatId].ProductDescription,
+                            _productSessions[chatId].MediaUrls,
+                            _productSessions[chatId].AddMoreMedia,
+                            cancellationToken);
                     return true;
 
                 case ProductSessionState.WaitingForMediaUpdate:
@@ -463,6 +477,7 @@ namespace Flickoo.Telegram.Services
             if (!_productSessions.ContainsKey(chatId) || _productSessions[chatId].ProductsQueue.Count == 0)
             {
                 await botClient.SendMessage(chatId, "Більше товарів немає.", cancellationToken: cancellationToken);
+                ResetSession(chatId);
                 return;
             }
 
@@ -525,8 +540,18 @@ namespace Flickoo.Telegram.Services
 
         public void ResetSession(long chatId)
         {
-            if (_productSessions.ContainsKey(chatId))
-                _productSessions.Remove(chatId);
+            if(_productSessions.ContainsKey(chatId))
+            {
+                var session = _productSessions[chatId];
+                session.State = ProductSessionState.Idle;
+                session.ProductId = 0;
+                session.MediaUrls.Clear();
+                session.ProductName = string.Empty;
+                session.Price = 0m;
+                session.ProductDescription = string.Empty;
+                session.CategoryId = 0;
+                session.AddMoreMedia = true;
+            }
         }
     }
 }

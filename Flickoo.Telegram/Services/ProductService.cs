@@ -13,6 +13,7 @@ namespace Flickoo.Telegram.Services
         private readonly HttpClient _httpClient;
         private readonly ILogger<ProductService> _logger;
         private readonly MainKeyboard _mainKeyboard;
+        private readonly MyProductKeyboard _myProductKeyboard;
         private readonly AddProductCategoryInlineKeyboard _addProductCategoryInlineKeyboard;
         private readonly AddProductMediaKeyboard _addProductMediaKeyboard;
         private readonly ProductInlineKeyboard _productInlineKeyboard;
@@ -22,6 +23,7 @@ namespace Flickoo.Telegram.Services
             HttpClient httpClient,
             ILogger<ProductService> logger,
             MainKeyboard mainKeyboard,
+            MyProductKeyboard myProductKeyboard,
             AddProductCategoryInlineKeyboard addProductCategoryInlineKeyboard,
             AddProductMediaKeyboard addProductMediaKeyboard,
             ProductInlineKeyboard productInlineKeyboard)
@@ -30,6 +32,7 @@ namespace Flickoo.Telegram.Services
             _httpClient = httpClient;
             _logger = logger;
             _mainKeyboard = mainKeyboard;
+            _myProductKeyboard = myProductKeyboard;
             _addProductCategoryInlineKeyboard = addProductCategoryInlineKeyboard;
             _addProductMediaKeyboard = addProductMediaKeyboard;
             _productInlineKeyboard = productInlineKeyboard;
@@ -52,8 +55,9 @@ namespace Flickoo.Telegram.Services
 
                 if (products == null || products.Count() == 0)
                 {
-                    await botClient.SendMessage(chatId, "Ви ще не додали жодного продукту", cancellationToken: cancellationToken);
+                    await _myProductKeyboard.SendMyProductKeyboard(botClient, chatId, "Ви ще не додали жодного продукту", cancellationToken);
                     _logger.LogWarning("Користувач ще не додав жодного продукту");
+
                 }
                 else
                 {
@@ -79,13 +83,15 @@ namespace Flickoo.Telegram.Services
                             }
                         }
                     }
+                    await _myProductKeyboard.SendMyProductKeyboard(botClient, chatId, "", cancellationToken);
                     _logger.LogInformation("Продукти успішно відправлені");
                 }
             }
             else if (productResponse.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                await botClient.SendMessage(chatId, "Ви ще не зареєстровані!", cancellationToken: cancellationToken);
+                await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Ви ще не зареєстровані");
                 _logger.LogWarning("Користувач не зареєстрований!");
+                
             }
             else
             {
@@ -154,7 +160,7 @@ namespace Flickoo.Telegram.Services
             if (productPrice == null || productPrice < 1)
             {
                 _logger.LogWarning("Введіть ціну(в грн)");
-                await botClient.SendMessage(chatId, "Введіть ціну", cancellationToken: cancellationToken);
+                await botClient.SendMessage(chatId, "Введіть ціну(в грн)", cancellationToken: cancellationToken);
                 return ProductSessionState.WaitingForPrice;
             }
 

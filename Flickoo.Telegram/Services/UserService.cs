@@ -179,7 +179,7 @@ namespace Flickoo.Telegram.Services
                 Registered = true
             };
 
-            var response = await _httpClient.PostAsJsonAsync("https://localhost:8443/api/User", user, cancellationToken: cancellationToken);
+            var response = await _httpClient.PostAsJsonAsync("https://localhost:8443/api/User/register", user, cancellationToken: cancellationToken);
             if (response.IsSuccessStatusCode)
             {
                 _logger.LogInformation($"Added user with Id:{id} | UserName: {null} | Location: {null}");

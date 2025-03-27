@@ -122,6 +122,8 @@ namespace Flickoo.Telegram
             {
                 case "назад":
                     await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Дію скасовано");
+                    _userSessionService.ResetSession(chatId);
+                    _productSessionService.ResetSession(chatId);
                     return true;
 
                 default:

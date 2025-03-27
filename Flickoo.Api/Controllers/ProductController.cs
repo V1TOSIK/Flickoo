@@ -35,7 +35,7 @@ namespace Flickoo.Api.Controllers
             if (id == 0)
                 return BadRequest();
 
-            if (!await _dbContext.Users.AnyAsync(u => u.Id == id))
+            if (!await _dbContext.Users.AnyAsync(u => u.Id == id && u.Registered))
                 return NotFound();
 
             var userProducts = await _dbContext.Products
