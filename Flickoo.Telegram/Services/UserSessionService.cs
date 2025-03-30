@@ -130,12 +130,6 @@ namespace Flickoo.Telegram.Services
             }
 
         }
-        public async Task<bool> CheckUserExist(ITelegramBotClient botClient,
-            long chatId,
-            CancellationToken cancellationToken)
-        {
-            throw new NotImplementedException();
-        }
 
         public UserSession GetUserSession(long chatId)
         {
@@ -162,8 +156,9 @@ namespace Flickoo.Telegram.Services
             {
                 var session = _userSessions[chatId];
                 session.State = UserSessionState.Idle;
-                session.UserName = null;
-                session.LocationName = null;
+                session.UserName = string.Empty;
+                session.LocationName = string.Empty;
+                
 
                 _userSessions.Remove(chatId);
             }

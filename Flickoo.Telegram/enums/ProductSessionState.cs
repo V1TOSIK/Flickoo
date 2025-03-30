@@ -9,13 +9,6 @@
         WaitingForProductName,
         WaitingForPrice,
         WaitingForDescription,
-        WaitingForMedia,
-        WaitingForCategoryUpdate,
-        WaitingForProductNameUpdate,
-        WaitingForPriceUpdate,
-        WaitingForDescriptionUpdate,
-        WaitingForMediaUpdate,
-        AddProduct,
-        UpdateProduct
+        WaitingForMedia
     }
 }

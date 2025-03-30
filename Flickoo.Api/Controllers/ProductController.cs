@@ -159,6 +159,20 @@ namespace Flickoo.Api.Controllers
             return Ok(categories);
         }
 
+        [HttpGet("userId/{productId}")]
+        public async Task<ActionResult<long>> GetSellerId([FromRoute] long productId)
+        {
+            var product = await _dbContext.Products
+                .AsNoTracking()
+                .Include(p => p.User)
+                .FirstOrDefaultAsync(p => p.Id == productId);
+
+            if (product?.User == null)
+                return NotFound();
+
+            return Ok(product.User.Id);
+        }
+
         // POST api/<ProductController>
         [HttpPost]
         public async Task<ActionResult> Post([FromBody] CreateOrUpdateProductRequest product)
@@ -271,6 +285,21 @@ namespace Flickoo.Api.Controllers
             await _dbContext.Products
                 .Where(p => p.Id == id)
                 .ExecuteDeleteAsync();
+
+            return Ok();
+        }
+
+        [HttpDelete("{productId}/user/{userId}")]
+        public async Task<ActionResult> RemoveLike([FromRoute] long userId, [FromRoute] long productId)
+        {
+            var rowsAffected = await _dbContext.Likes
+                .Where(l => l.UserId == userId && l.ProductId == productId)
+                .ExecuteDeleteAsync();
+
+            if (rowsAffected == 0)
+            {
+                return NotFound();
+            }
 
             return Ok();
         }

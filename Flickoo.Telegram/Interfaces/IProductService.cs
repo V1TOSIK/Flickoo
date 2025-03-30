@@ -40,6 +40,12 @@ namespace Flickoo.Telegram.Interfaces
             long productId,
             CancellationToken cancellationToken);
 
-        
+        Task WriteToSeller(ITelegramBotClient botClient,
+            long chatId,
+            long productId,
+            string userName,
+            CancellationToken cancellationToken);
+
+
     }
 }

@@ -1,5 +1,4 @@
-﻿using Flickoo.Telegram.DTOs;
-using Flickoo.Telegram.enums;
+﻿using Flickoo.Telegram.enums;
 using Flickoo.Telegram.Interfaces;
 using Flickoo.Telegram.Keyboards;
 using Telegram.Bot;
@@ -23,18 +22,13 @@ namespace Flickoo.Telegram
 
         public TelegramBotService(
             ITelegramBotClient botClient,
-            HttpClient httpClient,
             ILogger<TelegramBotService> logger,
             IUserService userService,
             IProductService productService,
-            IMediaService mediaService,
             IFavouriteService favouriteService,
             IUserSessionService userSessionService,
             IProductSessionService productSessionService,
-            MainKeyboard mainKeyboard,
-            MyProductKeyboard myProductKeyboard,
-            CategoriesInlineKeyboard categoriesInlineKeyboard,
-            LikeInlineKeyboard likeInlineKeyboard)
+            MainKeyboard mainKeyboard)
         {
             _botClient = botClient;
             _logger = logger;
@@ -101,6 +95,8 @@ namespace Flickoo.Telegram
             if (await _productSessionService.ProductSessionCheck(botClient, chatId, msg, cancellationToken))
                 return;
 
+            _userSessionService.ResetSession(chatId);
+            _productSessionService.ResetSession(chatId);
             await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Вибери потрібну команду на панелі");
 
 
@@ -121,9 +117,9 @@ namespace Flickoo.Telegram
             switch (command.Text.ToLower())
             {
                 case "назад":
-                    await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Дію скасовано");
                     _userSessionService.ResetSession(chatId);
                     _productSessionService.ResetSession(chatId);
+                    await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Дію скасовано");
                     return true;
 
                 default:
@@ -155,10 +151,12 @@ namespace Flickoo.Telegram
             }
 
             var splitData = callbackQuery.Data.Split("_");
+            var session = _productSessionService.GetProductSession(chatId);
 
             if (splitData[0] == "next")
             {
                 await _productSessionService.SendNextLikedProduct(botClient, chatId, cancellationToken);
+                return;
             }
             else if (splitData[0] == "like")
             {
@@ -167,10 +165,10 @@ namespace Flickoo.Telegram
                     int.Parse(splitData[1]),
                     cancellationToken);
                 await _productSessionService.SendNextProduct(botClient, chatId, cancellationToken);
+                return;
             }
             else if (splitData[0] == "first")
             {
-                var session = _productSessionService.GetProductSession(chatId);
                 if (splitData[1] == "new")
                 {
                     session.ProductsQueue = await _favouriteService.GetFavouriteProducts(botClient, chatId, "FirstNew", cancellationToken);
@@ -181,31 +179,35 @@ namespace Flickoo.Telegram
                     session.ProductsQueue = await _favouriteService.GetFavouriteProducts(botClient, chatId, "FirstOld", cancellationToken);
                     await _productSessionService.SendNextLikedProduct(botClient, chatId, cancellationToken);
                 }
-            }
-            else if (splitData[0] == "write")
-            {
-                await botClient.SendMessage(chatId, "Вибачте, ця функція ще не реалізована", cancellationToken: cancellationToken);
-                return;
+                    return;
             }
             else if (splitData[0] == "dislike")
             {
                 await _favouriteService.DislikeProduct(botClient,
                     chatId,
-                    int.Parse(splitData[1]),
+                    long.Parse(splitData[1]),
                     cancellationToken);
                 await _productSessionService.SendNextProduct(botClient, chatId, cancellationToken);
             }
+            else if (splitData[0] == "write")
+            {
+                await _productService.WriteToSeller(botClient, chatId, long.Parse(splitData[1]), callbackQuery?.From?.Username ?? "Unknown", cancellationToken);
+                return;
+            }
             else if (splitData[0] == "update")
             {
-                await _productSessionService.UpdateProduct(botClient, callbackQuery.Message, chatId, int.Parse(splitData[1]), cancellationToken);
+                session.ProductId = long.Parse(splitData[1]);
+                session.Action = "update";
+                await _productSessionService.ProductSessionCheck(botClient, chatId, callbackQuery.Message, cancellationToken);
+                return;
             }
             else if (splitData[0] == "delete")
             {
                 await _productService.DeleteProduct(botClient, chatId, int.Parse(splitData[1]), cancellationToken);
+                return;
             }
             else
             {
-                var session = _productSessionService.GetProductSession(chatId);
                 switch (session.State)
                 {
                     case ProductSessionState.WaitingForCategory:
