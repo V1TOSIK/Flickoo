@@ -5,6 +5,7 @@ using Flickoo.Telegram.enums;
 using Flickoo.Telegram.Keyboards;
 using Telegram.Bot;
 using Telegram.Bot.Types.ReplyMarkups;
+using Flickoo.Telegram.SessionModels;
 
 namespace Flickoo.Telegram.Services
 {
@@ -153,29 +154,28 @@ namespace Flickoo.Telegram.Services
 
         public async Task<UserSessionState> CreateAccount(ITelegramBotClient botClient,
             long chatId,
-            string? userName,
-            string? locationName,
+            UserSession session,
             CancellationToken cancellationToken)
         {
             var id = chatId;
 
-            if (string.IsNullOrWhiteSpace(userName))
+            if (string.IsNullOrWhiteSpace(session.UserName))
             {
                 await botClient.SendMessage(chatId, "Будь ласка, введіть ім'я користувача.", cancellationToken: cancellationToken);
-                return UserSessionState.CreateWaitingForUserName;
+                return UserSessionState.WaitingForUserName;
             }
 
-            if (string.IsNullOrWhiteSpace(locationName))
+            if (string.IsNullOrWhiteSpace(session.LocationName))
             {
                 await botClient.SendMessage(chatId, "Будь ласка, введіть вашу локацію.", cancellationToken: cancellationToken);
-                return UserSessionState.CreateWaitingForLocation;
+                return UserSessionState.WaitingForLocation;
             }
 
             var user = new CreateOrUpdateUserRequest
             {
                 Id = id,
-                Username = userName,
-                LocationName = locationName,
+                Username = session.UserName,
+                LocationName = session.LocationName,
                 Registered = true
             };
 
@@ -198,34 +198,33 @@ namespace Flickoo.Telegram.Services
 
         public async Task<UserSessionState> UpdateAccount(ITelegramBotClient botClient,
             long chatId,
-            string? userName,
-            string? locationName,
+            UserSession session,
             CancellationToken cancellationToken)
         {
-            if (string.IsNullOrWhiteSpace(userName))
+            if (string.IsNullOrWhiteSpace(session.UserName))
             {
                 await botClient.SendMessage(chatId, "Введіть нове ім'я, або ж залиште попереднє", cancellationToken: cancellationToken);
-                return UserSessionState.UpdateWaitingForUserName;
+                return UserSessionState.WaitingForUserName;
             }
 
-            if (string.IsNullOrWhiteSpace(locationName))
+            if (string.IsNullOrWhiteSpace(session.LocationName))
             {
                 await botClient.SendMessage(chatId, "Введіть нове місце розташування, або ж залиште попереднє", cancellationToken: cancellationToken);
-                return UserSessionState.UpdateWaitingForLocation;
+                return UserSessionState.WaitingForLocation;
             }
             
             var newUser = new CreateOrUpdateUserRequest()
             {
                 Id = chatId,
-                Username = userName,
-                LocationName = locationName
+                Username = session.UserName,
+                LocationName = session.LocationName
             };
 
             var response = await _httpClient.PutAsJsonAsync($"https://localhost:8443/api/User/{chatId}", newUser, cancellationToken: cancellationToken);
             
             if (response.IsSuccessStatusCode)
             {
-                _logger.LogInformation($"Updated user with Id:{chatId} | UserName: {userName} | Location: {locationName}");
+                _logger.LogInformation($"Updated user with Id:{chatId} | UserName: {session.UserName} | Location: {session.LocationName}");
                 await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Користувача успішно оновлено!");
             }
             else

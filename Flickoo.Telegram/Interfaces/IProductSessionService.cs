@@ -1,7 +1,6 @@
 ﻿using Flickoo.Telegram.SessionModels;
 using Telegram.Bot.Types;
 using Telegram.Bot;
-using Flickoo.Telegram.DTOs;
 
 namespace Flickoo.Telegram.Interfaces
 {
@@ -34,10 +33,14 @@ namespace Flickoo.Telegram.Interfaces
             long chatId,
             CancellationToken cancellationToken);
 
+        Task<bool> ProductCallback(ITelegramBotClient botClient,
+            CallbackQuery callbackQuery,
+            long chatId,
+            CancellationToken cancellationToken);
+
         ProductSession GetProductSession(long chatId);
 
         void ResetSession(long chatId);
-
 
     }
 }

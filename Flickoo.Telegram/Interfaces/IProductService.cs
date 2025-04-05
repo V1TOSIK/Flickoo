@@ -1,5 +1,6 @@
 ﻿using Flickoo.Telegram.DTOs;
 using Flickoo.Telegram.enums;
+using Flickoo.Telegram.SessionModels;
 using Telegram.Bot;
 
 namespace Flickoo.Telegram.Interfaces
@@ -17,22 +18,12 @@ namespace Flickoo.Telegram.Interfaces
 
         Task<ProductSessionState> AddProduct(ITelegramBotClient botClient,
             long chatId,
-            long categoryId,
-            string? productName,
-            decimal? productPrice,
-            string? productDescription,
-            List<string?> mediaUrl,
-            bool addMoreMedia,
+            ProductSession session,
             CancellationToken cancellationToken);
 
         Task<ProductSessionState> UpdateProduct(ITelegramBotClient botClient,
-            long productId,
             long chatId,
-            string? productName,
-            decimal? productPrice,
-            string? productDescription,
-            List<string?> mediaUrl,
-            bool addMoreMedia,
+            ProductSession session,
             CancellationToken cancellationToken);
      
         Task DeleteProduct(ITelegramBotClient botClient,

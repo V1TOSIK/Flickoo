@@ -1,4 +1,5 @@
 ﻿using Flickoo.Telegram.enums;
+using Flickoo.Telegram.SessionModels;
 using Telegram.Bot;
 
 namespace Flickoo.Telegram.Interfaces
@@ -11,14 +12,12 @@ namespace Flickoo.Telegram.Interfaces
 
         Task<UserSessionState> CreateAccount(ITelegramBotClient botClient,
             long chatId,
-            string? userName,
-            string? locationName,
+            UserSession session,
             CancellationToken cancellationToken);
 
         Task<UserSessionState> UpdateAccount(ITelegramBotClient botClient,
             long chatId,
-            string? userName,
-            string? locationName,
+            UserSession session,
             CancellationToken cancellationToken);
 
         Task<bool> AddUnRegisteredUser(ITelegramBotClient botClient,
