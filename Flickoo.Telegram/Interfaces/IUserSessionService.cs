@@ -14,9 +14,17 @@ namespace Flickoo.Telegram.Interfaces
         Task<bool> HandleUserCommand(ITelegramBotClient botClient,
             Message command,
             long chatId,
-            UserSession userSession,
             CancellationToken cancellationToken);
 
+        Task<bool> RegisterUser(ITelegramBotClient botClient,
+            Message msg,
+            long chatId,
+            CancellationToken cancellationToken);
+
+        Task<bool> UpdateUser(ITelegramBotClient botClient,
+            Message msg,
+            long chatId,
+            CancellationToken cancellationToken);
 
         UserSession GetUserSession(long chatId);
 

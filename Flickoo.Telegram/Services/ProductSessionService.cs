@@ -18,13 +18,15 @@ namespace Flickoo.Telegram.Services
         private readonly Dictionary<long, ProductSession> _productSessions = [];
         private readonly LikeInlineKeyboard _likeInlineKeyboard;
         private readonly CategoriesInlineKeyboard _categoriesInlineKeyboard;
+        private readonly IFavouriteService _favouriteService;
 
         public ProductSessionService(ILogger<ProductSessionService> logger,
             MainKeyboard mainKeyboard,
             IProductService productService,
             IMediaService mediaService,
             LikeInlineKeyboard likeInlineKeyboard,
-            CategoriesInlineKeyboard categoriesInlineKeyboard)
+            CategoriesInlineKeyboard categoriesInlineKeyboard,
+            IFavouriteService favouriteService)
         {
             _logger = logger;
             _mainKeyboard = mainKeyboard;
@@ -32,6 +34,7 @@ namespace Flickoo.Telegram.Services
             _mediaService = mediaService;   
             _likeInlineKeyboard = likeInlineKeyboard;
             _categoriesInlineKeyboard = categoriesInlineKeyboard;
+            _favouriteService = favouriteService;
         }
 
         public async Task<bool> ProductSessionCheck(ITelegramBotClient botClient,
@@ -41,7 +44,7 @@ namespace Flickoo.Telegram.Services
         {
             var session = GetProductSession(chatId);
 
-            if (session.Action == null)
+            if (string.IsNullOrEmpty(session.Action))
                 return await HandleProductCommand(botClient, msg, chatId, cancellationToken);
 
             else if (session.Action == "add")
@@ -52,8 +55,6 @@ namespace Flickoo.Telegram.Services
 
             else
                 return false;
-
-
         }
 
 
@@ -93,7 +94,7 @@ namespace Flickoo.Telegram.Services
 
                 case "додати продукт":
                     session.Action = "add";
-                    session.State = await AddProductMethod(botClient, chatId, session, cancellationToken);
+                    session.State = await _productService.AddProduct(botClient, chatId, session, cancellationToken);
 
                     if (session.State == ProductSessionState.Idle)
                         ResetSession(chatId);
@@ -120,8 +121,8 @@ namespace Flickoo.Telegram.Services
                     return true;
 
                 case ProductSessionState.WaitingForProductName:
-                    session.ProductName = msg.Text ?? "";
-                    session.State = await AddProductMethod(botClient, chatId, session, cancellationToken);
+                    session.Name = msg.Text ?? "";
+                    session.State = await _productService.AddProduct(botClient, chatId, session, cancellationToken);
                     return true;
 
                 case ProductSessionState.WaitingForPrice:
@@ -131,12 +132,12 @@ namespace Flickoo.Telegram.Services
                         return true;
                     }
                     session.Price = price;
-                    session.State = await AddProductMethod(botClient, chatId, session, cancellationToken);
+                    session.State = await _productService.AddProduct(botClient, chatId, session, cancellationToken);
                     return true;
 
                 case ProductSessionState.WaitingForDescription:
                     session.ProductDescription = msg.Text ?? "";
-                    session.State = await AddProductMethod(botClient, chatId, session, cancellationToken);
+                    session.State = await _productService.AddProduct(botClient, chatId, session, cancellationToken);
                     return true;
 
                 case ProductSessionState.WaitingForMedia:
@@ -163,13 +164,13 @@ namespace Flickoo.Telegram.Services
                     if (msg.Text == "готово")
                     {
                         session.AddMoreMedia = false;
-                        session.State = await AddProductMethod(botClient, chatId, session, cancellationToken);
+                        session.State = await _productService.AddProduct(botClient, chatId, session, cancellationToken);
                         ResetSession(chatId);
                         return true;
                     }
 
                     session.MediaUrls.Add(await _mediaService.GetMediaIdFromMsg(botClient, msg, chatId, cancellationToken));
-                    session.State = await AddProductMethod(botClient, chatId, session, cancellationToken);
+                    session.State = await _productService.AddProduct(botClient, chatId, session, cancellationToken);
 
                     return true;
 
@@ -189,11 +190,11 @@ namespace Flickoo.Telegram.Services
             switch (session.State)
             {
                 case ProductSessionState.Idle:
-                    session.State = await UpdateProductMethod(botClient, chatId, session, cancellationToken);
+                    session.State = await _productService.UpdateProduct(botClient, chatId, session, cancellationToken);
                     return true;
                 case ProductSessionState.WaitingForProductName:
-                    session.ProductName = msg.Text ?? "";
-                    session.State = await UpdateProductMethod(botClient, chatId, session, cancellationToken);
+                    session.Name = msg.Text ?? "";
+                    session.State = await _productService.UpdateProduct(botClient, chatId, session, cancellationToken);
                     return true;
 
                 case ProductSessionState.WaitingForPrice:
@@ -203,13 +204,13 @@ namespace Flickoo.Telegram.Services
                         return true;
                     }
                     session.Price = updatePrice;
-                    session.State = await UpdateProductMethod(botClient, chatId, session, cancellationToken);
+                    session.State = await _productService.UpdateProduct(botClient, chatId, session, cancellationToken);
                     return true;
 
                 case ProductSessionState.WaitingForDescription:
                     session.ProductDescription = msg.Text ?? "";
 
-                    session.State = await UpdateProductMethod(botClient, chatId, session, cancellationToken);
+                    session.State = await _productService.UpdateProduct(botClient, chatId, session, cancellationToken);
                     return true;
 
                 case ProductSessionState.WaitingForMedia:
@@ -231,20 +232,20 @@ namespace Flickoo.Telegram.Services
                     {
                         _logger.LogInformation("Повторне надсилання фото/відео");
                         session.MediaUrls.Clear();
-                        session.State = await UpdateProductMethod(botClient, chatId, session, cancellationToken);
+                        session.State = await _productService.UpdateProduct(botClient, chatId, session, cancellationToken);
                         return true;
                     }
 
                     if (msg.Text == "готово")
                     {
                         session.AddMoreMedia = false;
-                        session.State = await UpdateProductMethod(botClient, chatId, session, cancellationToken);
+                        session.State = await _productService.UpdateProduct(botClient, chatId, session, cancellationToken);
                         ResetSession(chatId);
                         return true;
                     }
 
                     session.MediaUrls.Add(await _mediaService.GetMediaIdFromMsg(botClient, msg, chatId, cancellationToken));
-                    session.State = await UpdateProductMethod(botClient, chatId, session, cancellationToken);
+                    session.State = await _productService.UpdateProduct(botClient, chatId, session, cancellationToken);
 
                     return true;
 
@@ -375,45 +376,122 @@ namespace Flickoo.Telegram.Services
                 session.State = ProductSessionState.Idle;
                 session.ProductId = 0;
                 session.MediaUrls.Clear();
-                session.ProductName = string.Empty;
+                session.Name = string.Empty;
                 session.Price = 0m;
                 session.ProductDescription = string.Empty;
                 session.CategoryId = 0;
                 session.AddMoreMedia = true;
-                session.Action = null;
+                session.Action = string.Empty;
+
+                _productSessions.Remove(chatId);
             }
-        }
-
-        private async Task<ProductSessionState> AddProductMethod(ITelegramBotClient botClient, long chatId, ProductSession session, CancellationToken cancellationToken)
-        {
-            return await _productService.AddProduct(botClient,
-                            chatId,
-                            session.CategoryId,
-                            session.ProductName,
-                            session.Price,
-                            session.ProductDescription,
-                            session.MediaUrls,
-                            session.AddMoreMedia,
-                            cancellationToken);
-        }
-
-        private async Task<ProductSessionState> UpdateProductMethod(ITelegramBotClient botClient, long chatId, ProductSession session, CancellationToken cancellationToken)
-        {
-            return await _productService.UpdateProduct(botClient,
-                           chatId,
-                           session.ProductId,
-                           session.ProductName,
-                           session.Price,
-                           session.ProductDescription,
-                           session.MediaUrls,
-                           session.AddMoreMedia,
-                           cancellationToken);
         }
 
         private async Task CancelAction(ITelegramBotClient botClient, long chatId, string messageText, CancellationToken cancellationToken)
         {
             await _mainKeyboard.SendMainKeyboard(botClient, chatId, messageText);
             ResetSession(chatId);
+        }
+
+        public async Task<bool> ProductCallback(ITelegramBotClient botClient,
+            CallbackQuery callbackQuery,
+            long chatId,
+            CancellationToken cancellationToken)
+        {
+
+            if (string.IsNullOrEmpty(callbackQuery.Data))
+            {
+                _logger.LogWarning("CallbackQuery не може бути пустим.");
+                await botClient.SendMessage(chatId, "CallbackQuery не може бути пустим.", cancellationToken: cancellationToken);
+                return false;
+            }
+
+            var splitData = callbackQuery.Data.Split("_");
+            var session = GetProductSession(chatId);
+
+            switch (splitData[0])
+            {
+                case "like":
+                    await _favouriteService.AddToFavouriteProduct(botClient,
+                        chatId,
+                        int.Parse(splitData[1]),
+                        cancellationToken);
+                    await SendNextProduct(botClient, chatId, cancellationToken);
+                    return true;
+
+                case "dislike":
+                    await _favouriteService.DislikeProduct(botClient,
+                    chatId,
+                    long.Parse(splitData[1]),
+                    cancellationToken);
+                    await SendNextProduct(botClient, chatId, cancellationToken);
+                    return true;
+
+                case "next":
+                    await SendNextProduct(botClient, chatId, cancellationToken);
+                    return true;
+
+                case "write":
+                    await _productService.WriteToSeller(botClient,
+                        chatId,
+                        long.Parse(splitData[1]),
+                        callbackQuery?.From?.Username ?? "Unknown",
+                        cancellationToken);
+                    return true;
+
+                case "update":
+                    session.ProductId = long.Parse(splitData[1]);
+                    session.Action = "update";
+                    await ProductSessionCheck(botClient,
+                        chatId,
+                        callbackQuery.Message,
+                        cancellationToken);
+                    return true;
+
+                case "delete":
+                    await _productService.DeleteProduct(botClient,
+                    chatId,
+                    int.Parse(splitData[1]),
+                    cancellationToken);
+                    return true;
+
+                case "first":
+                    if (splitData[1] == "old")
+                    {
+                        session.ProductsQueue = await _favouriteService.GetFavouriteProducts(botClient, chatId, "FirstOld", cancellationToken);
+                        await SendNextLikedProduct(botClient, chatId, cancellationToken);
+                    }
+                    else if (splitData[1] == "new")
+                    {
+                        session.ProductsQueue = await _favouriteService.GetFavouriteProducts(botClient, chatId, "FirstNew", cancellationToken);
+                        await SendNextLikedProduct(botClient, chatId, cancellationToken);
+                    }
+                    return true;
+
+                default:
+                    switch (session.State)
+                    {
+                        case ProductSessionState.WaitingForCategory:
+                            session.CategoryId = int.Parse(callbackQuery.Data);
+                            session.State = await _productService.AddProduct(botClient,
+                                chatId,
+                                session,
+                                cancellationToken);
+                            return true;
+
+                        case ProductSessionState.AwaitCategoryForSwaping:
+                            session.ProductsQueue = await _productService.GetProductsForSwaping(botClient, chatId, int.Parse(callbackQuery.Data), cancellationToken);
+
+                            await SendNextProduct(botClient, chatId, cancellationToken);
+                            return true;
+
+                            case ProductSessionState.SwapingLikedProducts:
+                            await SendNextLikedProduct(botClient, chatId, cancellationToken);
+                            return true;
+                    }
+                    return false;
+
+            }
         }
     }
 }

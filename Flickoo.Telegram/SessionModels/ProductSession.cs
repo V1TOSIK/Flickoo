@@ -8,7 +8,7 @@ namespace Flickoo.Telegram.SessionModels
         public ProductSessionState State{ get; set; } = ProductSessionState.Idle;
         public long ProductId { get; set; }
         public List<string?> MediaUrls { get; set; } = new List<string?>();
-        public string ProductName { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
         public decimal Price { get; set; } = 0m;
         public string ProductDescription { get; set; } = string.Empty;
         public long CategoryId { get; set; }

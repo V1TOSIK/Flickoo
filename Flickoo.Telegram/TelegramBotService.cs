@@ -1,5 +1,4 @@
-﻿using Flickoo.Telegram.enums;
-using Flickoo.Telegram.Interfaces;
+﻿using Flickoo.Telegram.Interfaces;
 using Flickoo.Telegram.Keyboards;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
@@ -14,8 +13,6 @@ namespace Flickoo.Telegram
         private readonly ITelegramBotClient _botClient;
         private readonly ILogger<TelegramBotService> _logger;
         private readonly IUserService _userService;
-        private readonly IProductService _productService;
-        private readonly IFavouriteService _favouriteService;
         private readonly IUserSessionService _userSessionService;
         private readonly IProductSessionService _productSessionService;
         private readonly MainKeyboard _mainKeyboard;
@@ -24,8 +21,6 @@ namespace Flickoo.Telegram
             ITelegramBotClient botClient,
             ILogger<TelegramBotService> logger,
             IUserService userService,
-            IProductService productService,
-            IFavouriteService favouriteService,
             IUserSessionService userSessionService,
             IProductSessionService productSessionService,
             MainKeyboard mainKeyboard)
@@ -33,8 +28,6 @@ namespace Flickoo.Telegram
             _botClient = botClient;
             _logger = logger;
             _userService = userService;
-            _productService = productService;
-            _favouriteService = favouriteService;
             _userSessionService = userSessionService;
             _productSessionService = productSessionService;
             _mainKeyboard = mainKeyboard;
@@ -91,7 +84,6 @@ namespace Flickoo.Telegram
             if (await _userSessionService.UserSessionCheck(botClient, chatId, msg, cancellationToken))
                 return;
             
-
             if (await _productSessionService.ProductSessionCheck(botClient, chatId, msg, cancellationToken))
                 return;
 
@@ -101,8 +93,6 @@ namespace Flickoo.Telegram
 
 
         }
-
-        
 
         private async Task<bool> HandleBaseCommand(ITelegramBotClient botClient,
             long chatId,
@@ -127,9 +117,6 @@ namespace Flickoo.Telegram
             }
         }
         
-
-        
-
         private async Task OnCallbackQuery(ITelegramBotClient botClient, CallbackQuery callbackQuery, CancellationToken cancellationToken)
         {
             if (callbackQuery.Message == null)
@@ -138,109 +125,17 @@ namespace Flickoo.Telegram
                 return;
             }
 
-
             var chatId = callbackQuery.Message.Chat.Id;
             var userName = callbackQuery.From.Username ?? "Unknown";
             _logger.LogInformation($"Отримано callbackQuery: {callbackQuery.Data} | ChatId: {chatId} | UserName: {userName} | Time: {DateTime.UtcNow}");
-            
-            if (string.IsNullOrEmpty(callbackQuery.Data))
-            {
-                _logger.LogWarning("CallbackQuery не може бути пустим.");
-                await botClient.SendMessage(chatId, "CallbackQuery не може бути пустим.", cancellationToken: cancellationToken);
+
+
+            if (await _productSessionService.ProductCallback(botClient, callbackQuery, chatId, cancellationToken))
                 return;
-            }
 
-            var splitData = callbackQuery.Data.Split("_");
-            var session = _productSessionService.GetProductSession(chatId);
-
-            if (splitData[0] == "next")
-            {
-                await _productSessionService.SendNextLikedProduct(botClient, chatId, cancellationToken);
-                return;
-            }
-            else if (splitData[0] == "like")
-            {
-                await _favouriteService.AddToFavouriteProduct(botClient,
-                    chatId,
-                    int.Parse(splitData[1]),
-                    cancellationToken);
-                await _productSessionService.SendNextProduct(botClient, chatId, cancellationToken);
-                return;
-            }
-            else if (splitData[0] == "first")
-            {
-                if (splitData[1] == "new")
-                {
-                    session.ProductsQueue = await _favouriteService.GetFavouriteProducts(botClient, chatId, "FirstNew", cancellationToken);
-                    await _productSessionService.SendNextLikedProduct(botClient, chatId, cancellationToken);
-                }
-                else if (splitData[1] == "old")
-                {
-                    session.ProductsQueue = await _favouriteService.GetFavouriteProducts(botClient, chatId, "FirstOld", cancellationToken);
-                    await _productSessionService.SendNextLikedProduct(botClient, chatId, cancellationToken);
-                }
-                    return;
-            }
-            else if (splitData[0] == "dislike")
-            {
-                await _favouriteService.DislikeProduct(botClient,
-                    chatId,
-                    long.Parse(splitData[1]),
-                    cancellationToken);
-                await _productSessionService.SendNextProduct(botClient, chatId, cancellationToken);
-            }
-            else if (splitData[0] == "write")
-            {
-                await _productService.WriteToSeller(botClient, chatId, long.Parse(splitData[1]), callbackQuery?.From?.Username ?? "Unknown", cancellationToken);
-                return;
-            }
-            else if (splitData[0] == "update")
-            {
-                session.ProductId = long.Parse(splitData[1]);
-                session.Action = "update";
-                await _productSessionService.ProductSessionCheck(botClient, chatId, callbackQuery.Message, cancellationToken);
-                return;
-            }
-            else if (splitData[0] == "delete")
-            {
-                await _productService.DeleteProduct(botClient, chatId, int.Parse(splitData[1]), cancellationToken);
-                return;
-            }
-            else
-            {
-                switch (session.State)
-                {
-                    case ProductSessionState.WaitingForCategory:
-                        session.CategoryId = int.Parse(callbackQuery.Data);
-                        session.State = await _productService.AddProduct(botClient,
-                            chatId,
-                            session.CategoryId,
-                            session.ProductName,
-                            session.Price,
-                            session.ProductDescription,
-                            session.MediaUrls,
-                            session.AddMoreMedia,
-                            cancellationToken);
-                        break;
-
-                    case ProductSessionState.AwaitCategoryForSwaping:
-
-                        session.ProductsQueue = await _productService.GetProductsForSwaping(botClient, chatId, int.Parse(callbackQuery.Data), cancellationToken);
-
-                        await _productSessionService.SendNextProduct(botClient, chatId, cancellationToken);
-                        return;
-
-                    case ProductSessionState.SwapingLikedProducts:
-                        await _productSessionService.SendNextLikedProduct(botClient, chatId, cancellationToken);
-                        return;
-
-                    default:
-                        session.State = ProductSessionState.Idle;
-                        return;
-                }
-
-            }
-            return;
+            _userSessionService.ResetSession(chatId);
+            _productSessionService.ResetSession(chatId);
+            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Вибери потрібну команду на панелі");
         }
 
         private async Task UnknownUpdateHandlerAsync(ITelegramBotClient botClient, Update update)
