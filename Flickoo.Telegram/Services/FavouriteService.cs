@@ -38,7 +38,7 @@ namespace Flickoo.Telegram.Services
             {
                 await botClient.SendMessage(chatId, "Помилка при лайку продукту", cancellationToken: cancellationToken);
 
-                var responseContent = await response.Content.ReadAsStringAsync();
+                var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
                 _logger.LogError($"Error while liking product: {responseContent}");
             }
         }
@@ -56,12 +56,12 @@ namespace Flickoo.Telegram.Services
 
             var response = await _httpClient.DeleteAsync($"https://localhost:8443/api/Product/{productId}/user/{chatId}", cancellationToken);
             if (response.IsSuccessStatusCode)
-            {
-                await botClient.SendMessage(chatId, "👎", cancellationToken: cancellationToken);
                 _logger.LogInformation($"product is disliked");
-            }
+
             else
                 _logger.LogWarning("product not disliked");
+
+            await botClient.SendMessage(chatId, "👎", cancellationToken: cancellationToken);
         }
 
         public async Task<Queue<GetProductResponse>> GetFavouriteProducts(ITelegramBotClient botClient,
@@ -73,7 +73,7 @@ namespace Flickoo.Telegram.Services
             if (response.IsSuccessStatusCode)
             {
                 var products = await response.Content.ReadFromJsonAsync<Queue<GetProductResponse>>(cancellationToken: cancellationToken);
-                if (products == null || products.Count() == 0)
+                if (products == null || products.Count == 0)
                 {
                     await botClient.SendMessage(chatId, "Кінець списку", cancellationToken: cancellationToken);
                     _logger.LogWarning("Лайкнуті продукти закінчилися");

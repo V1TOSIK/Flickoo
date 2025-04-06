@@ -67,7 +67,7 @@ namespace Flickoo.Telegram.Services
         {
             if (mediaId != null)
             {
-                var file = await botClient.GetFile(mediaId);
+                var file = await botClient.GetFile(mediaId, cancellationToken);
                 var filePath = file.FilePath;
                 string extension = Path.GetExtension(filePath) ?? "";
 

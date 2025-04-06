@@ -36,7 +36,5 @@ namespace Flickoo.Telegram.Interfaces
             long productId,
             string userName,
             CancellationToken cancellationToken);
-
-
     }
 }
