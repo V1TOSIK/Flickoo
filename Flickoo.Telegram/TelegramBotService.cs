@@ -1,5 +1,4 @@
 ﻿using Flickoo.Telegram.Interfaces;
-using Flickoo.Telegram.Keyboards;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
@@ -15,7 +14,7 @@ namespace Flickoo.Telegram
         private readonly IUserService _userService;
         private readonly IUserSessionService _userSessionService;
         private readonly IProductSessionService _productSessionService;
-        private readonly MainKeyboard _mainKeyboard;
+        private readonly IKeyboards _keyboards;
 
         public TelegramBotService(
             ITelegramBotClient botClient,
@@ -23,14 +22,14 @@ namespace Flickoo.Telegram
             IUserService userService,
             IUserSessionService userSessionService,
             IProductSessionService productSessionService,
-            MainKeyboard mainKeyboard)
+            IKeyboards keyboards)
         {
             _botClient = botClient;
             _logger = logger;
             _userService = userService;
             _userSessionService = userSessionService;
             _productSessionService = productSessionService;
-            _mainKeyboard = mainKeyboard;
+            _keyboards = keyboards;
         }
 
         protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -76,7 +75,6 @@ namespace Flickoo.Telegram
                 await botClient.SendMessage(chatId, "Повідомлення не може бути пустим.", cancellationToken: cancellationToken);
                 return;
             }
-            await _userService.AddUnRegisteredUser(botClient, chatId, userName, cancellationToken);
 
             if (await HandleBaseCommand(botClient, chatId, msg, cancellationToken))
                 return;
@@ -89,7 +87,7 @@ namespace Flickoo.Telegram
 
             _userSessionService.ResetSession(chatId);
             _productSessionService.ResetSession(chatId);
-            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Вибери потрібну команду на панелі");
+            await _keyboards.SendMainKeyboard(botClient, chatId, "Вибери потрібну команду на панелі", cancellationToken);
 
 
         }
@@ -104,12 +102,36 @@ namespace Flickoo.Telegram
                 _logger.LogWarning("Пуста команда.");
                 return false;
             }
+
+            if (command.From == null)
+            {
+                _logger.LogWarning("Не вдалося отримати дані користувача.");
+                return false;
+            }
+
             switch (command.Text.ToLower())
             {
+                case "/start":
+                    await _keyboards.SendMainKeyboard(botClient, chatId, "Привіт 👋😊\n" +
+                        "Якщо потрібна допомога, то в меню є команда - > /help\n" +
+                        "Приємного користування 👋", cancellationToken);
+                    await _userService.AddUnRegisteredUser(botClient, chatId, command.From.Username ?? "Unknown", cancellationToken);
+                    return true;
+
+                case "/help":
+
+                    await _keyboards.SendMainKeyboard(botClient, chatId, "Нажаль допомога поки не працює\n" +
+                        "Думаю у вас не буде проблем з ботом", cancellationToken);
+                    return true;
+
+                    case "/language":
+                    await _keyboards.SendMainKeyboard(botClient, chatId, "Додаток підтримує лише українську мову", cancellationToken);
+                    return true;
+
                 case "назад":
                     _userSessionService.ResetSession(chatId);
                     _productSessionService.ResetSession(chatId);
-                    await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Дію скасовано");
+                    await _keyboards.SendMainKeyboard(botClient, chatId, "Дію скасовано", cancellationToken);
                     return true;
 
                 default:
@@ -135,7 +157,7 @@ namespace Flickoo.Telegram
 
             _userSessionService.ResetSession(chatId);
             _productSessionService.ResetSession(chatId);
-            await _mainKeyboard.SendMainKeyboard(botClient, chatId, "Вибери потрібну команду на панелі");
+            await _keyboards.SendMainKeyboard(botClient, chatId, "Вибери потрібну команду на панелі", cancellationToken);
         }
 
         private async Task UnknownUpdateHandlerAsync(ITelegramBotClient botClient, Update update)

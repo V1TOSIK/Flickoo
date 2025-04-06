@@ -1,6 +1,5 @@
 ﻿using Flickoo.Telegram.enums;
 using Flickoo.Telegram.Interfaces;
-using Flickoo.Telegram.Keyboards;
 using Flickoo.Telegram.SessionModels;
 using Telegram.Bot.Types;
 using Telegram.Bot;
@@ -10,16 +9,16 @@ namespace Flickoo.Telegram.Services
     public class UserSessionService : IUserSessionService
     {
         private readonly IUserService _userService;
-        private readonly MainKeyboard _mainKeyboard;
         private readonly ILogger<UserSessionService> _logger;
-        private readonly Dictionary<long, UserSession> _userSessions = new();
+        private readonly IKeyboards _keyboards;
+        private readonly Dictionary<long, UserSession> _userSessions = [];
         public UserSessionService(IUserService userService,
             ILogger<UserSessionService> logger,
-            MainKeyboard mainKeyboard)
+            IKeyboards keyboards)
         {
             _userService = userService;
             _logger = logger;
-            _mainKeyboard = mainKeyboard;
+            _keyboards = keyboards;
         }
         public async Task<bool> UserSessionCheck(ITelegramBotClient botClient, long chatId, Message msg, CancellationToken cancellationToken)
         {
@@ -53,7 +52,7 @@ namespace Flickoo.Telegram.Services
 
             switch (command.Text.ToLower())
             {
-                case "мій профіль":
+                case "👤":
                     await _userService.MyProfile(botClient, chatId, cancellationToken);
                     return true;
 
@@ -61,8 +60,7 @@ namespace Flickoo.Telegram.Services
                     session.Action = "Create";
                     session.State = await _userService.CreateAccount(botClient,
                         chatId,
-                        session.UserName ?? "",
-                        session.LocationName,
+                        session,
                         cancellationToken);
 
                     if (_userSessions[chatId].State == UserSessionState.Idle)
@@ -74,8 +72,7 @@ namespace Flickoo.Telegram.Services
                     session.Action = "Update";
                     session.State = await _userService.UpdateAccount(botClient,
                         chatId,
-                        session.UserName,
-                        session.LocationName,
+                        session,
                         cancellationToken);
                     if (_userSessions[chatId].State == UserSessionState.Idle)
                         ResetSession(chatId);
@@ -124,7 +121,7 @@ namespace Flickoo.Telegram.Services
                         return true;
                     }
                     session.UserName = msg.Text ?? "";
-                    session.State = await _userService.CreateAccount(botClient, chatId, session.UserName, session.LocationName, cancellationToken);
+                    session.State = await _userService.CreateAccount(botClient, chatId, session, cancellationToken);
                     return true;
 
                 case UserSessionState.WaitingForLocation:
@@ -134,7 +131,7 @@ namespace Flickoo.Telegram.Services
                         return true;
                     }
                     session.LocationName = msg.Text ?? "";
-                    session.State = await _userService.CreateAccount(botClient, chatId, session.UserName, session.LocationName, cancellationToken);
+                    session.State = await _userService.CreateAccount(botClient, chatId, session, cancellationToken);
                     ResetSession(chatId);
                     return true;
                 default:
@@ -155,7 +152,7 @@ namespace Flickoo.Telegram.Services
                         return true;
                     }
                     session.UserName = msg.Text ?? "";
-                    session.State = await _userService.UpdateAccount(botClient, chatId, session.UserName, session.LocationName, cancellationToken);
+                    session.State = await _userService.UpdateAccount(botClient, chatId, session, cancellationToken);
                     return true;
 
                 case UserSessionState.WaitingForLocation:
@@ -165,7 +162,7 @@ namespace Flickoo.Telegram.Services
                         return true;
                     }
                     session.LocationName = msg.Text ?? "";
-                    session.State = await _userService.UpdateAccount(botClient, chatId, session.UserName, session.LocationName, cancellationToken);
+                    session.State = await _userService.UpdateAccount(botClient, chatId, session, cancellationToken);
                     ResetSession(chatId);
                     return true;
 
@@ -176,7 +173,7 @@ namespace Flickoo.Telegram.Services
 
         private async Task CancelAction(ITelegramBotClient botClient, long chatId, string messageText, CancellationToken cancellationToken)
         {
-            await _mainKeyboard.SendMainKeyboard(botClient, chatId, messageText);
+            await _keyboards.SendMainKeyboard(botClient, chatId, messageText, cancellationToken);
             ResetSession(chatId);
         }
     }
