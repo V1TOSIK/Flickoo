@@ -275,7 +275,7 @@ namespace Flickoo.Telegram.Services
             {
                 InlineKeyboardButton.WithCallbackData("➡️", $"next"),
                 InlineKeyboardButton.WithCallbackData("💬", $"write_{product.Id}"),
-                InlineKeyboardButton.WithCallbackData("👎", $"dislike_{product.Id}")
+                InlineKeyboardButton.WithCallbackData("👎", $"delliked_{product.Id}")
             });
             var mediaList = await _mediaService.GetMediaGroup(botClient, product.MediaUrls, cancellationToken);
 
@@ -318,7 +318,7 @@ namespace Flickoo.Telegram.Services
             if ( session.ProductsQueue.Count == 0)
             {
                 await botClient.SendMessage(chatId, "Більше товарів немає.", cancellationToken: cancellationToken);
-                ResetSession(chatId);
+                session.State = ProductSessionState.AwaitCategoryForSwaping;
                 return;
             }
 
@@ -429,6 +429,14 @@ namespace Flickoo.Telegram.Services
                         long.Parse(splitData[1]),
                         cancellationToken);
                     await SendNextProduct(botClient, chatId, cancellationToken);
+                    return true;
+
+                case "delliked":
+                    await _favouriteService.DislikeProduct(botClient,
+                        chatId,
+                        long.Parse(splitData[1]),
+                        cancellationToken);
+                    await SendNextLikedProduct(botClient, chatId, cancellationToken);
                     return true;
 
                 case "next":

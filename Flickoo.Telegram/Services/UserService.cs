@@ -130,7 +130,7 @@ namespace Flickoo.Telegram.Services
         {
             if (!await UserCheck(botClient, chatId, session, "", cancellationToken))
             {
-                return UserSessionState.WaitingForUserName;
+                return session.State;
             }
 
             var user = new CreateOrUpdateUserRequest
@@ -163,7 +163,7 @@ namespace Flickoo.Telegram.Services
         {
             if (!await UserCheck(botClient, chatId, session, "(new)", cancellationToken))
             {
-                return UserSessionState.WaitingForUserName;
+                return session.State;
             }
 
             var newUser = new CreateOrUpdateUserRequest()
@@ -199,12 +199,14 @@ namespace Flickoo.Telegram.Services
             if (string.IsNullOrWhiteSpace(session.UserName))
             {
                 await _keyboards.SendCancelKeyboard(botClient, chatId, $"Будь ласка, введіть ім'я користувача. {checkTypeText}", cancellationToken: cancellationToken);
+                session.State = UserSessionState.WaitingForUserName;
                 return false;
             }
 
             if (string.IsNullOrWhiteSpace(session.LocationName))
             {
                 await _keyboards.SendCancelKeyboard(botClient, chatId, $"Будь ласка, введіть вашу локацію. {checkTypeText}", cancellationToken: cancellationToken);
+                session.State = UserSessionState.WaitingForLocation;
                 return false;
             }
 
