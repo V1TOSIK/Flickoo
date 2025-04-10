@@ -20,9 +20,9 @@ namespace Flickoo.Api.Data
 
         public DbSet<User> Users { get; set; }
         public DbSet<Product> Products { get; set; }
-        public DbSet<Like> Likes { get; set; }
+        public DbSet<Favourite> Favourites { get; set; }
         public DbSet<Category> Categories { get; set; }
-        public DbSet<MediaFile> MediaFiles { get; set; }
+        public DbSet<Media> Medias { get; set; }
         public DbSet<Location> Locations { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

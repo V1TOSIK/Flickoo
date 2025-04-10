@@ -1,8 +1,8 @@
 ﻿namespace Flickoo.Api.Entities
 {
-    public class Like
+    public class Favourite
     {
-        public Like()
+        public Favourite()
         {
             CreatedAt = DateTime.UtcNow;
         }

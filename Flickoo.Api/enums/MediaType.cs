@@ -2,7 +2,7 @@
 {
     public enum MediaType
     {
-        unknown,
+        Unknown,
         ImageJpeg,
         ImagePng,
         VideoMp4

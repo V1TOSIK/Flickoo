@@ -1,7 +1,9 @@
-﻿using Flickoo.Api.Data;
-using Flickoo.Api.DTOs;
+﻿using Flickoo.Api.DTOs.Product.Create;
+using Flickoo.Api.DTOs.Product.Get;
+using Flickoo.Api.DTOs.Product.Update;
+using Flickoo.Api.DTOs.User.Get;
 using Flickoo.Api.Entities;
-using Flickoo.Api.Interfaces;
+using Flickoo.Api.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,297 +13,217 @@ namespace Flickoo.Api.Controllers
     [ApiController]
     public class ProductController : ControllerBase
     {
-        private readonly FlickooDbContext _dbContext;
-        private readonly IMediaRepository _mediaRepository;
-        private readonly IProductRepository _productRepository;
+        private readonly IProductService _productService;
         private readonly ILogger<ProductController> _logger;
 
-        public ProductController(FlickooDbContext dbContext,
-            IMediaRepository mediaRepository,
-            IProductRepository productRepository,
+        public ProductController(IProductService productService,
             ILogger<ProductController> logger)
         {
-            _dbContext = dbContext;
-            _mediaRepository = mediaRepository;
-            _productRepository = productRepository;
+            _productService = productService;
             _logger = logger;
 
         }
 
-        // GET api/<ProductController>/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<ICollection<Product>>> GetByUserId([FromRoute] long id)
+        //GET
+        #region GET
+        
+        [HttpGet]
+        public async Task<ActionResult<ICollection<GetProductResponse>>> GetAllProductsAsync()
         {
-            if (id == 0)
-                return BadRequest();
-
-            if (!await _dbContext.Users.AnyAsync(u => u.Id == id && u.Registered))
+            var products = await _productService.GetAllProductsAsync();
+            if (products == null)
                 return NotFound();
-
-            var userProducts = await _dbContext.Products
-                .AsNoTracking()
-                .Where(p => p.UserId == id)
-                .OrderByDescending(p => p.CreatedAt)
-                .Include(p => p.Category)
-                .Include(p => p.MediaUrls)
-                .ToListAsync();
-
-            var productResponse = userProducts.Select(p => new ProductResponse
+            var productResponse = products.Select(p => new GetProductResponse()
             {
                 Id = p.Id,
                 Name = p.Name,
-                Price = p.Price,
+                PriceAmount = p.PriceAmount,
+                PriceCurrency = p.PriceCurrency,
                 Description = p.Description,
-                CategoryName = p.Category?.Name ?? "",
-                MediaUrls = p.MediaUrls?.Select(m => m?.Url).ToList() ?? []
+                MediaUrls = p.MediaUrls
             }).ToList();
+            return Ok(productResponse);
+        }
+
+        [HttpGet("{productId}")]
+        public async Task<ActionResult<ICollection<GetProductResponse>>> GetByCategory([FromRoute] long productId)
+        {
+            if (productId == 0)
+                return BadRequest();
+
+            var product = await _productService.GetProductByIdAsync(productId);
+
+            if (product == null)
+                return NotFound();
+
+            var productResponse = new GetProductResponse()
+            {
+                Id = product.Id,
+                Name = product.Name,
+                PriceAmount = product.PriceAmount,
+                PriceCurrency = product.PriceCurrency,
+                Description = product.Description,
+                MediaUrls = product.MediaUrls
+            };
 
             return Ok(productResponse);
         }
 
-        [HttpGet("liked/{userId}/{filter}")]
-        public async Task<ActionResult<ICollection<ProductResponse>>> GetLikedProduct([FromRoute] long userId, [FromRoute] string filter)
+        [HttpGet("myproducts/{userId}")]
+        public async Task<ActionResult<ICollection<GetProductResponse>>> GetProductsByUserIdAsync([FromRoute] long userId)
         {
             if (userId == 0)
                 return BadRequest();
 
-            if (!await _dbContext.Users.AnyAsync(u => u.Id == userId))
+            var products = await _productService.GetProductsByUserIdAsync(userId);
+
+            if (products == null)
                 return NotFound();
-
-
-            var query = await _dbContext.Likes
-                .AsNoTracking()
-                .Where(l => l.UserId == userId)
-                .Include(l => l.Product)
-                    .ThenInclude(p => p.Category)
-                .Include(l => l.Product.MediaUrls)
-                .ToListAsync();
-
-            if (filter == "FirstNew")
-                query = query.OrderByDescending(l => l.Product.CreatedAt).ToList();
-
-            else if (filter == "FirstOld")
-                query = query.OrderBy(l => l.Product.CreatedAt).ToList();
-
-            else
-                return BadRequest();
-
-            var likedProducts = query
-                .Select(l => l.Product)
-                .ToList();
-
-            var productResponse = likedProducts.Select(p => new ProductResponse()
-                {
-                    Id = p.Id,
-                    Name = p.Name,
-                    Price = p.Price,
-                    Description = p.Description,
-                    CategoryName = p.Category?.Name ?? "",
-                    MediaUrls = p.MediaUrls?.Select(m => m?.Url).ToList() ?? []
-                }).ToList();
-            return Ok(productResponse);
-        }
-
-        [HttpGet("bycategory/{categoryid}")]
-        public async Task<ActionResult<ICollection<Product>>> GetByCategory([FromRoute] long categoryId)
-        {
-            if (categoryId == 0)
-            {
-                var productList = await _dbContext.Products
-                    .AsNoTracking()
-                    .OrderByDescending(p => p.CreatedAt)
-                    .Include(p => p.Category)
-                    .Include(p => p.MediaUrls)
-                    .ToListAsync();
-
-                var productResponse = productList.Select(p => new ProductResponse
-                {
-                    Id = p.Id,
-                    Name = p.Name,
-                    Price = p.Price,
-                    Description = p.Description,
-                    CategoryName = p.Category?.Name ?? "",
-                    MediaUrls = p.MediaUrls?.Select(m => m?.Url).ToList() ?? []
-                }).ToList();
-
-                return Ok(productResponse);
-            }
-
-            if (!await _dbContext.Categories.AnyAsync(c => c.Id == categoryId))
-                return NotFound();
-
-            var categoryProducts = await _dbContext.Products
-                .AsNoTracking()
-                .Where(p => p.CategoryId == categoryId)
-                .OrderByDescending(p => p.CreatedAt)
-                .Include(p => p.Category)
-                .Include(p => p.MediaUrls)
-                .ToListAsync();
-            var productByCategoryResponse = categoryProducts.Select(p => new ProductResponse
+            
+            var productResponse = products.Select(p => new GetProductResponse()
             {
                 Id = p.Id,
                 Name = p.Name,
-                Price = p.Price,
+                PriceAmount = p.PriceAmount,
+                PriceCurrency = p.PriceCurrency,
                 Description = p.Description,
-                CategoryName = p.Category?.Name ?? "",
-                MediaUrls = p.MediaUrls?.Select(m => m?.Url).ToList() ?? []
+                MediaUrls = p.MediaUrls
             }).ToList();
 
-            return Ok(productByCategoryResponse);
+            return Ok(productResponse);
         }
 
-        [HttpGet("category")]
-        public async Task<ActionResult<ICollection<Category>>> GetCategories()
+        [HttpGet("category/{categoryId}")]
+        public async Task<ActionResult<ICollection<GetProductResponse>>> GetProductsByCategoryAsync([FromRoute] long categoryId)
         {
-            var categories = await _dbContext.Categories
-                .AsNoTracking()
-                .ToListAsync();
-            return Ok(categories);
-        }
-
-        [HttpGet("userId/{productId}")]
-        public async Task<ActionResult<long>> GetSellerId([FromRoute] long productId)
-        {
-            var product = await _dbContext.Products
-                .AsNoTracking()
-                .Include(p => p.User)
-                .FirstOrDefaultAsync(p => p.Id == productId);
-
-            if (product?.User == null)
-                return NotFound();
-
-            return Ok(product.User.Id);
-        }
-
-        // POST api/<ProductController>
-        [HttpPost]
-        public async Task<ActionResult> Post([FromBody] CreateOrUpdateProductRequest product)
-        {
-            var newProduct = await _productRepository.AddProductAsync(product);
-
-            if (newProduct == null)
+            if (categoryId == 0)
                 return BadRequest();
 
-            foreach (var mediaUrl in product.MediaUrls)
+            var products = await _productService.GetProductsByCategoryIdAsync(categoryId);
+
+            if (products == null)
+                return NotFound();
+
+            var productResponse = products.Select(p => new GetProductResponse()
             {
-                if (mediaUrl == null)
-                {
-                    _logger.LogError("MediaUrl is null");
-                    return BadRequest();
-                }
-                await _mediaRepository.AddMediaAsync(mediaUrl, newProduct.Id);
+                Id = p.Id,
+                Name = p.Name,
+                PriceAmount = p.PriceAmount,
+                PriceCurrency = p.PriceCurrency,
+                Description = p.Description,
+                MediaUrls = p.MediaUrls
+            }).ToList();
+
+            return Ok(productResponse);
+        }
+
+        [HttpGet("{productId}/seller")]
+        public async Task<ActionResult<GetUserResponse>> GetSellerId([FromRoute] long productId)
+        {
+            if (productId == 0)
+                return BadRequest();
+
+            var response = await _productService.GetSellerByProductIdAsync(productId);
+            if (response == null)
+            {
+                _logger.LogError("Product not found");
+                return NotFound();
             }
-            return Ok();
+            
+            _logger.LogInformation("Product found");
+            return Ok(response);
         }
 
-        [HttpPost("like/{productId}/user/{userId}")]
-        public async Task<ActionResult> PostLike([FromRoute] long productId, [FromRoute] long userId)
+        #endregion
+
+        // POST
+        #region POST
+        [HttpPost]
+        public async Task<ActionResult<string>> Post([FromBody] CreateProductRequest request)
         {
-            var productExists = await _dbContext.Products.FirstOrDefaultAsync(p => p.Id == productId);
-
-            if (productExists == null)
-                return NotFound();
-
-            var userExists = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
-            if (userExists == null)
-                return NotFound();
-
-            var likeExists = await _dbContext.Likes
-                .AnyAsync(l => l.ProductId == productId && l.UserId == userId);
-
-            if (likeExists)
-                return Ok();
-
-            var newLike = new Like
+            if (request == null)
             {
-                ProductId = productId,
-                Product = productExists,
-                UserId = userId,
-                User = userExists
-            };
+                _logger.LogError("Product is null");
+                return BadRequest("Error: Product is null");
+            }
 
-            await _dbContext.Likes.AddAsync(newLike);
-            await _dbContext.SaveChangesAsync();
-            return Ok();
+            if (string.IsNullOrEmpty(request.Name) && request.PriceAmount == 0 && string.IsNullOrEmpty(request.PriceCurrency) && string.IsNullOrEmpty(request.Description))
+            {
+                _logger.LogError("Product is empty");
+                return BadRequest("Error: Product is empty");
+            }
+
+            if (request.MediaUrls == null)
+            {
+                _logger.LogError("MediaUrls is null");
+                return BadRequest("Error: MediaUrls is null");
+            }
+
+            var response = await _productService.AddProductAsync(request);
+
+            if (!response)
+            {
+                _logger.LogError("Product was not added");
+                return BadRequest("Error: Product was not added");
+            }
+
+            _logger.LogInformation("Product was added");
+            return Ok("Product was added. Successful");
         }
+        #endregion
 
-        // PUT api/<ProductController>/5
-        [HttpPut("{id}")]
-        public async Task<ActionResult> Put([FromRoute] long id, [FromBody] CreateOrUpdateProductRequest product)
+        // PUT
+        #region PUT
+        [HttpPut("{productId}")]
+        public async Task<ActionResult<string>> UpdateProductAsync([FromRoute] long productId, [FromBody] UpdateProductRequest request)
         {
+            if (productId == 0)
+            {
+                _logger.LogError("Product ID is 0");
+                return BadRequest("Error: Product ID = 0");
+            }
+            if (request == null)
+            {
+                _logger.LogError("Product is null");
+                return BadRequest("Error: Product is null");
+            }
 
-            var productFromDb = await _dbContext.Products.FirstOrDefaultAsync(p => p.Id == id);
+            if (string.IsNullOrEmpty(request.Name) && request.PriceAmount == 0 && string.IsNullOrEmpty(request.PriceCurrency) && string.IsNullOrEmpty(request.Description))
+                return BadRequest("Error: Product is empty");
 
-            if (productFromDb == null)
-                return NotFound();
-
-            var name = product.Name ?? productFromDb.Name;
-            var price = product.Price;
-            var description = product.Description ?? productFromDb.Description;
-
-            if (product.MediaUrls == null)
+            if (request.MediaUrls == null)
             {
                 _logger.LogError("MediaUrls is null");
                 return BadRequest();
             }
 
-            _dbContext.MediaFiles
-                .Where(m => m.ProductId == id)
-                .ExecuteDelete();
+            var response = await _productService.UpdateProductAsync(productId, request);
 
-            foreach (var mediaUrl in product.MediaUrls)
-            {
-                if (mediaUrl == null)
-                {
-                    _logger.LogError("MediaUrl is null");
-                    return BadRequest();
-                }
-                productFromDb.MediaUrls.Add(new MediaFile
-                {
-                    ProductId = productFromDb.Id,
-                    Url = mediaUrl
-                });
-            }
+            if (!response)
+                return NotFound("Product not found");
 
-            await _dbContext.Products
-                .Where(p => p.Id == id)
-                .ExecuteUpdateAsync(p => p
-                    .SetProperty(p => p.Name, name)
-                    .SetProperty(p => p.Price, price)
-                    .SetProperty(p => p.Description, description)
-                );
-            await _dbContext.SaveChangesAsync();
-            return Ok();
+            _logger.LogInformation("Product was updated");
+
+            return Ok("Product was updated. Successful");
         }
+        #endregion
 
-        // DELETE api/<ProductController>/5
-        [HttpDelete("{id}")]
-        public async Task<ActionResult> Delete([FromRoute] long id)
+        // DELETE
+        #region DELETE
+        [HttpDelete("{productId}")]
+        public async Task<ActionResult<string>> DeleteProductAsync([FromRoute] long productId)
         {
-            var productExists = await _dbContext.Products.AnyAsync(p => p.Id == id);
-            if (!productExists)
-                return NotFound();
+            if (productId == 0)
+                return BadRequest("Error: Product ID = 0");
 
-            await _dbContext.Products
-                .Where(p => p.Id == id)
-                .ExecuteDeleteAsync();
+            var response = await _productService.DeleteProductAsync(productId);
+            if (!response)
+                return NotFound("Product not found");
 
-            return Ok();
+            _logger.LogInformation("Product was deleted");
+
+            return Ok("Product was deleted. Successful");
         }
-
-        [HttpDelete("{productId}/user/{userId}")]
-        public async Task<ActionResult> RemoveLike([FromRoute] long userId, [FromRoute] long productId)
-        {
-            var rowsAffected = await _dbContext.Likes
-                .Where(l => l.UserId == userId && l.ProductId == productId)
-                .ExecuteDeleteAsync();
-
-            if (rowsAffected == 0)
-            {
-                return NotFound();
-            }
-
-            return Ok();
-        }
+        #endregion
     }
 }

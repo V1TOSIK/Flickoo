@@ -8,20 +8,35 @@ namespace Flickoo.Api.Data.Configurations
     {
         public void Configure(EntityTypeBuilder<User> builder)
         {
-            builder.ToTable("Users").HasKey(u => u.Id);
-            builder.Property(u => u.Id).HasColumnName("UserId");
-            builder.Property(u => u.Username).IsRequired();
-            builder.Property(u => u.CreatedAt).IsRequired();
-            builder.Property(u => u.Registered).IsRequired();
+            builder.ToTable("Users")
+                .HasKey(u => u.Id);
+            
+            builder.Property(u => u.Id)
+                .HasColumnName("UserId");
+            
+            builder.Property(u => u.Username)
+                .IsRequired();
+            
+            builder.Property(u => u.Nickname)
+                .IsRequired();
+
+            builder.Property(u => u.CreatedAt)
+                .IsRequired();
+            
+            builder.Property(u => u.Registered)
+                .IsRequired();
+            
             builder.HasOne(u => u.Location)
                 .WithMany(l => l.Users)
                 .HasForeignKey(u => u.LocationId)
                 .OnDelete(DeleteBehavior.Cascade);
+            
             builder.HasMany(u => u.Products)
                 .WithOne(p => p.User)
                 .HasForeignKey(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
-            builder.HasMany(u => u.Likes)
+            
+            builder.HasMany(u => u.Favourites)
                 .WithOne(l => l.User)
                 .HasForeignKey(l => l.UserId)
                 .OnDelete(DeleteBehavior.Cascade);

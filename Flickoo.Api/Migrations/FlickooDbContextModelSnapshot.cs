@@ -40,12 +40,12 @@ namespace Flickoo.Api.Migrations
                     b.ToTable("Categories", (string)null);
                 });
 
-            modelBuilder.Entity("Flickoo.Api.Entities.Like", b =>
+            modelBuilder.Entity("Flickoo.Api.Entities.Favourite", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bigint")
-                        .HasColumnName("LikeId");
+                        .HasColumnName("FavouriteId");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
@@ -64,7 +64,7 @@ namespace Flickoo.Api.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Likes", (string)null);
+                    b.ToTable("Favourites", (string)null);
                 });
 
             modelBuilder.Entity("Flickoo.Api.Entities.Location", b =>
@@ -85,7 +85,7 @@ namespace Flickoo.Api.Migrations
                     b.ToTable("Locations", (string)null);
                 });
 
-            modelBuilder.Entity("Flickoo.Api.Entities.MediaFile", b =>
+            modelBuilder.Entity("Flickoo.Api.Entities.Media", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -97,8 +97,9 @@ namespace Flickoo.Api.Migrations
                     b.Property<long>("ProductId")
                         .HasColumnType("bigint");
 
-                    b.Property<int>("TypeOfMedia")
-                        .HasColumnType("integer");
+                    b.Property<string>("TypeOfMedia")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<string>("Url")
                         .IsRequired()
@@ -108,7 +109,7 @@ namespace Flickoo.Api.Migrations
 
                     b.HasIndex("ProductId");
 
-                    b.ToTable("MediaFiles", (string)null);
+                    b.ToTable("Medias", (string)null);
                 });
 
             modelBuilder.Entity("Flickoo.Api.Entities.Product", b =>
@@ -128,14 +129,15 @@ namespace Flickoo.Api.Migrations
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<long>("LocationId")
+                        .HasColumnType("bigint");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<decimal>("Price")
-                        .HasColumnType("numeric");
 
                     b.Property<long>("UserId")
                         .HasColumnType("bigint");
@@ -143,6 +145,8 @@ namespace Flickoo.Api.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CategoryId");
+
+                    b.HasIndex("LocationId");
 
                     b.HasIndex("UserId");
 
@@ -164,6 +168,10 @@ namespace Flickoo.Api.Migrations
                     b.Property<long>("LocationId")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("Nickname")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<bool>("Registered")
                         .HasColumnType("boolean");
 
@@ -178,16 +186,16 @@ namespace Flickoo.Api.Migrations
                     b.ToTable("Users", (string)null);
                 });
 
-            modelBuilder.Entity("Flickoo.Api.Entities.Like", b =>
+            modelBuilder.Entity("Flickoo.Api.Entities.Favourite", b =>
                 {
                     b.HasOne("Flickoo.Api.Entities.Product", "Product")
-                        .WithMany("Likes")
+                        .WithMany("Favourites")
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("Flickoo.Api.Entities.User", "User")
-                        .WithMany("Likes")
+                        .WithMany("Favourites")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -197,10 +205,10 @@ namespace Flickoo.Api.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Flickoo.Api.Entities.MediaFile", b =>
+            modelBuilder.Entity("Flickoo.Api.Entities.Media", b =>
                 {
                     b.HasOne("Flickoo.Api.Entities.Product", "Product")
-                        .WithMany("MediaUrls")
+                        .WithMany("ProductMedias")
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -216,13 +224,47 @@ namespace Flickoo.Api.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Flickoo.Api.Entities.Location", "Location")
+                        .WithMany("Products")
+                        .HasForeignKey("LocationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("Flickoo.Api.Entities.User", "User")
                         .WithMany("Products")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.OwnsOne("Flickoo.Api.ValueObjects.Price", "Price", b1 =>
+                        {
+                            b1.Property<long>("ProductId")
+                                .HasColumnType("bigint");
+
+                            b1.Property<decimal>("Amount")
+                                .HasColumnType("numeric")
+                                .HasColumnName("PriceAmount");
+
+                            b1.Property<string>("Currency")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("PriceCurrency");
+
+                            b1.HasKey("ProductId");
+
+                            b1.ToTable("Products");
+
+                            b1.WithOwner()
+                                .HasForeignKey("ProductId");
+                        });
+
                     b.Navigation("Category");
+
+                    b.Navigation("Location");
+
+                    b.Navigation("Price")
+                        .IsRequired();
 
                     b.Navigation("User");
                 });
@@ -245,19 +287,21 @@ namespace Flickoo.Api.Migrations
 
             modelBuilder.Entity("Flickoo.Api.Entities.Location", b =>
                 {
+                    b.Navigation("Products");
+
                     b.Navigation("Users");
                 });
 
             modelBuilder.Entity("Flickoo.Api.Entities.Product", b =>
                 {
-                    b.Navigation("Likes");
+                    b.Navigation("Favourites");
 
-                    b.Navigation("MediaUrls");
+                    b.Navigation("ProductMedias");
                 });
 
             modelBuilder.Entity("Flickoo.Api.Entities.User", b =>
                 {
-                    b.Navigation("Likes");
+                    b.Navigation("Favourites");
 
                     b.Navigation("Products");
                 });
