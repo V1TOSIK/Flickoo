@@ -23,7 +23,7 @@ namespace Flickoo.Api.Services
 
         public async Task<GetUserResponse?> GetUserByIdAsync(long userId)
         {
-            if (userId == 0)
+            if (userId < 0)
             {
                 _logger.LogError("GetUserById: Invalid user ID provided.");
                 return null;
@@ -42,8 +42,11 @@ namespace Flickoo.Api.Services
             _logger.LogInformation($"GetUserById: User with ID {userId} retrieved successfully.");
             var response = new GetUserResponse
             {
+                Id = user.Id,
+                Nickname = user.Nickname,
                 Username = user.Username,
-                LocationName = user.Location.Name
+                LocationName = user.Location.Name,
+                Registered = user.Registered,
             };
             return response;
         }
@@ -58,13 +61,13 @@ namespace Flickoo.Api.Services
             var existingUser = await _userRepository.GetUserByIdAsync(request.Id);
 
             var location = await _locationRepository.GetLocationByNameAsync(request.LocationName);
-            long locationId = 0;
+            long locationId = -1;
             if (location == null)
             {
                 _logger.LogError($"AddUnregisteredUser: Location with name {request.LocationName} not found.");
                 locationId = await _locationRepository.AddLocationAsync(new Location
                 {
-                    Name = char.ToUpper(request.LocationName[0]) + request.LocationName.Substring(1).ToLower()
+                    Name = request.LocationName
                 });
                 _logger.LogInformation($"AddUnregisteredUser: Location with name {request.LocationName} added successfully.");
             }
@@ -110,13 +113,13 @@ namespace Flickoo.Api.Services
             }
 
             var location = await _locationRepository.GetLocationByNameAsync(request.LocationName);
-            long locationId = 0;
+            long locationId = -1;
             if (location == null)
             {
                 _logger.LogError($"AddUnregisteredUser: Location with name {request.LocationName} not found.");
                 locationId = await _locationRepository.AddLocationAsync(new Location
                 {
-                    Name = char.ToUpper(request.LocationName[0]) + request.LocationName.Substring(1).ToLower()
+                    Name = request.LocationName
                 });
                 _logger.LogInformation($"AddUnregisteredUser: Location with name {request.LocationName} added successfully.");
             }
@@ -172,13 +175,13 @@ namespace Flickoo.Api.Services
                 return false;
             }
 
-            if (userId == 0)
+            if (userId < 0)
             {
                 _logger.LogError("UpdateUser: Invalid user ID provided.");
                 return false;
             }
 
-            long locationId = 0;
+            long locationId = -1;
             if (!string.IsNullOrEmpty(request.LocationName))
             {
                 var location = await _locationRepository.GetLocationByNameAsync(request.LocationName);
@@ -187,7 +190,7 @@ namespace Flickoo.Api.Services
                     _logger.LogError($"AddUnregisteredUser: Location with name {request.LocationName} not found.");
                     locationId = await _locationRepository.AddLocationAsync(new Location
                     {
-                        Name = char.ToUpper(request.LocationName[0]) + request.LocationName.Substring(1).ToLower()
+                        Name = request.LocationName
                     });
                     _logger.LogInformation($"AddUnregisteredUser: Location with name {request.LocationName} added successfully.");
                 }
@@ -200,6 +203,7 @@ namespace Flickoo.Api.Services
             {
                 Id = userId,
                 Username = request.Username ?? "",
+                Nickname = request.Nickname ?? "",
                 LocationId = locationId,
                 Registered = request.Registered
             };
@@ -208,7 +212,7 @@ namespace Flickoo.Api.Services
 
         public async Task<bool> DeleteUserAsync(long userId)
         {
-            if (userId == 0)
+            if (userId < 0)
             {
                 _logger.LogError("DeleteUser: Invalid user ID provided.");
                 return false;

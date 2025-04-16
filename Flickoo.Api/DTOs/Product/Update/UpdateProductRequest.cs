@@ -8,6 +8,5 @@
         public string? PriceCurrency { get; set; } = string.Empty;
         public string? LocationName { get; set; } = string.Empty;
         public string? Description { get; set; } = string.Empty;
-        public List<string> MediaUrls { get; set; } = [];
     }
 }

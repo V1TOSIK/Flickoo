@@ -38,7 +38,7 @@ namespace Flickoo.Api.Controllers
         [HttpGet("{categoryId}")]
         public async Task<ActionResult<GetCategoryResponse>> GetCategoryByIdAsync(long categoryId)
         {
-            if (categoryId <= 0)
+            if (categoryId < 0)
             {
                 _logger.LogError("GetCategoryByIdAsync: Invalid category ID provided.");
                 return BadRequest("Invalid category ID provided.");
@@ -89,7 +89,7 @@ namespace Flickoo.Api.Controllers
         [HttpPut("{categoryId}")]
         public async Task<ActionResult<string>> UpdateCategoryAsync([FromRoute] long categoryId, [FromBody] UpdateCategoryRequest request)
         {
-            if (categoryId <= 0)
+            if (categoryId < 0)
             {
                 _logger.LogError("UpdateCategory: Invalid category ID provided.");
                 return BadRequest("Invalid category ID provided.");
@@ -119,7 +119,7 @@ namespace Flickoo.Api.Controllers
         [HttpDelete("{categoryId}")]
         public async Task<ActionResult<string>> DeleteCategoryAsync([FromRoute] long categoryId)
         {
-            if (categoryId <= 0)
+            if (categoryId < 0)
             {
                 _logger.LogError("DeleteCategory: Invalid category ID provided.");
                 return BadRequest("Invalid category ID provided.");

@@ -1,4 +1,4 @@
-﻿using Flickoo.Telegram.DTOs;
+﻿using Flickoo.Telegram.DTOs.Product;
 using Flickoo.Telegram.enums;
 using Flickoo.Telegram.SessionModels;
 using Telegram.Bot;
@@ -16,7 +16,7 @@ namespace Flickoo.Telegram.Interfaces
             long categoryId,
             CancellationToken cancellationToken);
 
-        Task<ProductSessionState> AddProduct(ITelegramBotClient botClient,
+        Task<ProductSessionState> AddProductAsync(ITelegramBotClient botClient,
             long chatId,
             ProductSession session,
             CancellationToken cancellationToken);

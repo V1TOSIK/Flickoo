@@ -17,7 +17,7 @@ namespace Flickoo.Api.Services
 
         public async Task<IEnumerable<long>> GetFavouriteProductIdsAsync(long userId)
         {
-            if (userId == 0)
+            if (userId < 0)
             {
                 _logger.LogError("GetFavouriteProductIdsAsync: Invalid user ID provided.");
                 return Enumerable.Empty<long>();
@@ -38,7 +38,7 @@ namespace Flickoo.Api.Services
 
         public async Task<IEnumerable<GetProductResponse>> GetFavouriteProductsAsync(long userId)
         {
-            if (userId == 0)
+            if (userId < 0)
             {
                 _logger.LogError("GetFavouriteProductsAsync: Invalid user ID provided.");
                 return Enumerable.Empty<GetProductResponse>();
@@ -73,7 +73,7 @@ namespace Flickoo.Api.Services
 
         public async Task<bool> AddFavouritesAsync(long userId, long productId)
         {
-            if (userId == 0 || productId == 0)
+            if (userId < 0 || productId < 0)
             {
                 _logger.LogError("AddToFavouritesAsync: Invalid user ID or product ID provided.");
                 return false;
@@ -94,7 +94,7 @@ namespace Flickoo.Api.Services
 
         public async Task<bool> RemoveFavouritesAsync(long userId, long productId)
         {
-            if (userId == 0 || productId == 0)
+            if (userId < 0 || productId < 0)
             {
                 _logger.LogError("RemoveFromFavouritesAsync: Invalid user ID or product ID provided.");
                 return false;
@@ -115,7 +115,7 @@ namespace Flickoo.Api.Services
 
         public async Task<bool> IsFavouriteAsync(long userId, long productId)
         {
-            if (userId == 0 || productId == 0)
+            if (userId < 0 || productId < 0)
             {
                 _logger.LogError("IsProductInFavouritesAsync: Invalid user ID or product ID provided.");
                 return false;
@@ -136,7 +136,7 @@ namespace Flickoo.Api.Services
 
         public async Task<bool> ClearFavouritesAsync(long userId)
         {
-            if (userId == 0)
+            if (userId < 0)
             {
                 _logger.LogError("ClearFavouritesAsync: Invalid user ID provided.");
                 return false;

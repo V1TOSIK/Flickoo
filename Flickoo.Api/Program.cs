@@ -30,6 +30,9 @@ builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<ILocationService, LocationService>();
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<IFavouriteService, FavouriteService>();
+builder.Services.AddScoped<IMediaService, MediaService>();
+
+builder.Services.AddScoped<IStorageService, MinioService>();
 
 var app = builder.Build();
 

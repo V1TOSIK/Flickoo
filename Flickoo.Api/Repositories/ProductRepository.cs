@@ -33,7 +33,7 @@ namespace Flickoo.Api.Repositories
 
         public async Task<IEnumerable<Product>> GetProductsByUserIdAsync(long userId)
         {
-            if (userId == 0)
+            if (userId < 0)
             {
                 _logger.LogWarning("Id is 0");
                 return [];
@@ -56,7 +56,7 @@ namespace Flickoo.Api.Repositories
 
         public async Task<IEnumerable<Product>> GetProductsByCategoryIdAsync(long categoryId)
         {
-            if (categoryId == 0)
+            if (categoryId < 0)
             {
                 _logger.LogWarning("Id is 0");
                 return [];
@@ -79,7 +79,7 @@ namespace Flickoo.Api.Repositories
 
         public async Task<Product?> GetProductByIdAsync(long productId)
         {
-            if (productId == 0)
+            if (productId < 0)
             {
                 _logger.LogWarning("Id is 0");
                 return null;
@@ -194,7 +194,7 @@ namespace Flickoo.Api.Repositories
 
         public async Task<bool> DeleteProductAsync(long productId)
         {
-            if (productId == 0)
+            if (productId < 0)
             {
                 _logger.LogWarning("Id is 0");
                 return false;

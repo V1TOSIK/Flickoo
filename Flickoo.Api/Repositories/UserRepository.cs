@@ -17,7 +17,7 @@ namespace Flickoo.Api.Repositories
 
         public async Task<User?> GetUserByIdAsync(long id)
         {
-            if (id == 0)
+            if (id < 0)
             {
                 _logger.LogError("GetUserByIdAsync: Invalid user ID provided.");
                 return null;
@@ -76,7 +76,7 @@ namespace Flickoo.Api.Repositories
 
         public async Task<bool> DeleteUserAsync(long id)
         {
-            if (id == 0)
+            if (id < 0)
             {
                 _logger.LogError("DeleteUserAsync: Invalid user ID provided.");
                 return false;
@@ -86,9 +86,14 @@ namespace Flickoo.Api.Repositories
                 .AnyAsync(u => u.Id == id);
             if (userExist)
             {
-                await _dbContext.Users
+                var deleteResult = await _dbContext.Users
                     .Where(u => u.Id == id)
                     .ExecuteDeleteAsync();
+                if(deleteResult == 0)
+                {
+                    _logger.LogWarning($"DeleteUserAsync: User with ID {id} not found.");
+                    return false;
+                }
                 _logger.LogInformation($"DeleteUserAsync: User with ID {id} deleted successfully.");
                 return true;
             }
@@ -101,7 +106,7 @@ namespace Flickoo.Api.Repositories
 
         public async Task<bool> CheckUserExistAsync(long id)
         {
-            if (id == 0)
+            if (id < 0)
             {
                 _logger.LogError("CheckUserExistAsync: Invalid user ID provided.");
                 return false;
@@ -113,7 +118,7 @@ namespace Flickoo.Api.Repositories
 
         public async Task<bool> CheckUserRegistrationAsync(long id)
         {
-            if (id == 0)
+            if (id < 0)
             {
                 _logger.LogError("CheckUserRegistrationAsync: Invalid user ID provided.");
                 return false;

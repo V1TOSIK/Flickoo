@@ -1,4 +1,4 @@
-﻿using Flickoo.Telegram.DTOs;
+﻿using Flickoo.Telegram.DTOs.User;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 
@@ -15,5 +15,6 @@ namespace Flickoo.Telegram.Interfaces
         Task SendMyProfileKeyboard(ITelegramBotClient botClient, long chatId, GetUserResponse user, string messageText, CancellationToken cancellationToken);
         Task SendMyProfileRegKeyboard(ITelegramBotClient botClient, long chatId, string messageText, CancellationToken cancellationToken);
         Task SendCancelKeyboard(ITelegramBotClient botClient, long chatId, string messageText, CancellationToken cancellationToken);
+        Task SendCurrencyKeyboard(ITelegramBotClient botClient, long chatId, string messageText, CancellationToken cancellationToken);
     }
 }

@@ -17,7 +17,7 @@ namespace Flickoo.Api.Repositories
 
         public async Task<Location?> GetLocationByIdAsync(long id)
         {
-            if (id == 0)
+            if (id < 0)
             {
                 _logger.LogError("GetLocationByIdAsync: Invalid location ID provided.");
                 return null;
@@ -58,8 +58,9 @@ namespace Flickoo.Api.Repositories
             if (location == null)
             {
                 _logger.LogError("AddLocationAsync: Location is null.");
-                return 0;
+                return -1;
             }
+            location.Name = char.ToUpper(location.Name[0]) + location.Name.Substring(1).ToLower();
             await _dbContext.Locations.AddAsync(location);
             await _dbContext.SaveChangesAsync();
             _logger.LogInformation($"AddLocationAsync: Location with ID {location.Id} added successfully.");
@@ -94,7 +95,7 @@ namespace Flickoo.Api.Repositories
 
         public async Task<bool> DeleteLocationAsync(long id)
         {
-            if (id == 0)
+            if (id < 0)
             {
                 _logger.LogError("DeleteLocationAsync: Invalid location ID provided.");
                 return false;
@@ -107,9 +108,16 @@ namespace Flickoo.Api.Repositories
                 _logger.LogWarning($"DeleteLocationAsync: Location with ID {id} not found.");
                 return false;
             }
-            _dbContext.Locations
+            var deleteResult = await _dbContext.Locations
                 .Where(l => l.Id == id)
-                .ExecuteDelete();
+                .ExecuteDeleteAsync();
+
+            if (deleteResult == 0)
+            {
+                _logger.LogError($"DeleteLocationAsync: Failed to delete location with ID {id}.");
+                return false;
+            }
+
             _logger.LogInformation($"DeleteLocationAsync: Location with ID {id} deleted successfully.");
             return true;
         }

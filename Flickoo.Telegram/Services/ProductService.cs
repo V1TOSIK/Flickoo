@@ -1,11 +1,13 @@
 ﻿using Telegram.Bot;
 using Flickoo.Telegram.Interfaces;
 using Flickoo.Telegram.enums;
-using Flickoo.Telegram.DTOs;
 using System.Net.Http.Json;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
 using Flickoo.Telegram.SessionModels;
+using Flickoo.Telegram.DTOs.Product;
+using Flickoo.Telegram.DTOs.Media;
+using Flickoo.Telegram.DTOs.User;
 
 namespace Flickoo.Telegram.Services
 {
@@ -38,7 +40,7 @@ namespace Flickoo.Telegram.Services
                 throw new ArgumentNullException(nameof(chatId));
             }
 
-            var productResponse = await _httpClient.GetAsync($"https://localhost:8443/api/Product/{chatId}", cancellationToken);
+            var productResponse = await _httpClient.GetAsync($"https://localhost:8443/api/Product/myproducts/{chatId}", cancellationToken);
 
             if (productResponse.IsSuccessStatusCode)
             {
@@ -56,32 +58,29 @@ namespace Flickoo.Telegram.Services
                     {
                         if (products != null)
                         {
-
-                            if (product.MediaUrls == null || product.MediaUrls.Count == 0)
+                            var productMedias = await _mediaService.GetMediaFromUrlsByProductIdAsync(botClient, product.Id, cancellationToken);
+                            if (productMedias == null || productMedias.Count == 0)
                             {
                                 await _keyboards.SendReductProductButtons(botClient,
                                     chatId,
                                     product.Id,
                                     $"📢 {product.Name}\n" +
-                                    $"💰 {product.Price} грн\n" +
-                                    /*$"📍 Локація: {product.Location}\n" +*/
+                                    $"💰 {product.PriceAmount}  {product.PriceCurrency}\n" +
+                                    $"📍 Локація: {product.LocationName}\n" +
                                     $"──────────────────────────\n" +
                                     $"📜 Опис: {product.Description}",
                                     cancellationToken);
                             }
                             else
                             {
-                                var mediaGroup = await _mediaService.GetMediaGroup(botClient, product.MediaUrls, cancellationToken);
-
-                                if (mediaGroup.Count > 0)
-                                    await botClient.SendMediaGroup(chatId, mediaGroup, cancellationToken: cancellationToken);
+                                await botClient.SendMediaGroup(chatId, productMedias, cancellationToken: cancellationToken);
 
                                 await _keyboards.SendReductProductButtons(botClient,
                                     chatId,
                                     product.Id,
                                     $"📢 {product.Name}\n" +
-                                    $"💰 {product.Price} грн\n" +
-                                    /*$"📍 Локація: {product.Location}\n" +*/
+                                    $"💰 {product.PriceAmount}  {product.PriceCurrency}\n" +
+                                    $"📍 Локація: {product.LocationName}\n" +
                                     $"──────────────────────────\n" +
                                     $"📜 Опис: {product.Description}",
                                     cancellationToken);
@@ -112,7 +111,7 @@ namespace Flickoo.Telegram.Services
             CancellationToken cancellationToken)
         {
 
-            var response = await _httpClient.GetAsync($"https://localhost:8443/api/Product/bycategory/{categoryId}", cancellationToken);
+            var response = await _httpClient.GetAsync($"https://localhost:8443/api/Product/category/{categoryId}", cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
@@ -136,7 +135,7 @@ namespace Flickoo.Telegram.Services
             return [];
         }
 
-        public async Task<ProductSessionState> AddProduct(ITelegramBotClient botClient,
+        public async Task<ProductSessionState> AddProductAsync(ITelegramBotClient botClient,
             long chatId,
             ProductSession session,
             CancellationToken cancellationToken)
@@ -144,11 +143,11 @@ namespace Flickoo.Telegram.Services
             if (!await ProductCheck(botClient, chatId, session, "Add", cancellationToken))
                 return session.State;
 
-            var product = new CreateOrUpdateProductRequest
+            var product = new CreateProductRequest
             {
-                MediaUrls = session.MediaUrls,
                 Name = session.Name,
-                Price = session.Price,
+                PriceAmount = session.PriceAmount,
+                PriceCurrency = session.PriceCurrency,
                 Description = session.ProductDescription,
                 UserId = chatId,
                 CategoryId = session.CategoryId
@@ -164,6 +163,43 @@ namespace Flickoo.Telegram.Services
             {
                 await _keyboards.SendMainKeyboard(botClient, chatId, "Помилка при додаванні продукту", cancellationToken);
                 _logger.LogError("Помилка при додаванні продукту");
+            }
+            var productId = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (!long.TryParse(productId, out long productIdParsed))
+            {
+                _logger.LogError("Не вдалося отримати ID продукту");
+                await _keyboards.SendMainKeyboard(botClient, chatId, "Не вдалося отримати ID продукту", cancellationToken);
+                return ProductSessionState.Idle;
+            }
+            if (session.MediaFiles != null && session.MediaFiles.Count > 0)
+            {
+                var mediaRequests = new List<MediaRequest>();
+                for (int i = 0; i < session.MediaFiles.Count; i++)
+                {
+                    var mediaFile = session.MediaFiles[i];
+                    if (mediaFile.CanSeek)
+                        mediaFile.Position = 0;
+
+                    var mediaRequest = new MediaRequest
+                    {
+                        ProductId = productIdParsed,
+                        FileName = $"{chatId}_{productIdParsed}_{i + 1}.{session.MediaTypes[i]}",
+                        ContentType = session.MediaTypes[i],
+                        FileStream = mediaFile
+                    };
+                    mediaRequests.Add(mediaRequest);
+                }
+
+                var res = await _mediaService.UploadMediasAsync(botClient, mediaRequests, productIdParsed, cancellationToken);
+                if (res)
+                {
+                    _logger.LogInformation("Медіа успішно додано");
+                }
+                else
+                {
+                    _logger.LogError("Помилка при додаванні медіа");
+                    await _keyboards.SendMainKeyboard(botClient, chatId, "Помилка при додаванні медіа", cancellationToken);
+                }
             }
 
             return ProductSessionState.Idle;
@@ -184,13 +220,13 @@ namespace Flickoo.Telegram.Services
             if (!await ProductCheck(botClient, chatId, session, "Update", cancellationToken))
                 return session.State;
 
-            var product = new CreateOrUpdateProductRequest
+            var product = new UpdateProductRequest
             {
                 Name = session.Name,
-                Price = session.Price,
+                PriceAmount = session.PriceAmount,
+                PriceCurrency = session.PriceCurrency,
                 Description = session.ProductDescription,
-                UserId = chatId,
-                MediaUrls = session.MediaUrls
+                UserId = chatId
             };
 
             var response = await _httpClient.PutAsJsonAsync($"https://localhost:8443/api/Product/{session.ProductId}", product, cancellationToken);
@@ -203,6 +239,24 @@ namespace Flickoo.Telegram.Services
             {
                 await _keyboards.SendMainKeyboard(botClient, chatId, "Помилка при оновлені продукту", cancellationToken);
                 _logger.LogError("Помилка при оновлені продукту");
+            }
+
+            if (session.MediaFiles != null && session.MediaFiles.Count > 0)
+            {
+                var mediaRequests = new List<MediaRequest>();
+                for (int i = 0; i < session.MediaFiles.Count; i++)
+                {
+                    var mediaFile = session.MediaFiles[i];
+                    var mediaRequest = new MediaRequest
+                    {
+                        ProductId = session.ProductId,
+                        FileName = $"{chatId}_{session.ProductId}_{i + 1}.{session.MediaTypes[i]}",
+                        FileStream = mediaFile
+                    };
+                    mediaRequests.Add(mediaRequest);
+                }
+                
+                await _mediaService.UpdateProductMediasAsync(botClient, mediaRequests, product.Id, cancellationToken);
             }
 
             return ProductSessionState.Idle;
@@ -220,6 +274,7 @@ namespace Flickoo.Telegram.Services
                 return;
             }
             var response = await _httpClient.DeleteAsync($"https://localhost:8443/api/Product/{productId}", cancellationToken);
+
             if (response.IsSuccessStatusCode)
             {
                 await _keyboards.SendMainKeyboard(botClient, chatId, "Продукт успішно видалено", cancellationToken);
@@ -230,46 +285,57 @@ namespace Flickoo.Telegram.Services
                 await _keyboards.SendMainKeyboard(botClient, chatId, "Помилка при видаленні продукту", cancellationToken);
                 _logger.LogError("Помилка при видаленні продукту");
             }
+
+            var responseMedias = await _httpClient.DeleteAsync($"https://localhost:8443/api/Media/{productId}", cancellationToken);
+            if (responseMedias.IsSuccessStatusCode)
+            {
+                _logger.LogInformation("Медіа успішно видалено");
+            }
+            else
+            {
+                _logger.LogError("Помилка при видаленні медіа");
+            }
         }
 
-        public async Task WriteToSeller(ITelegramBotClient botClient, long chatId, long productId, string userName, CancellationToken cancellationToken)
+        public async Task WriteToSeller(ITelegramBotClient botClient,
+            long chatId,
+            long productId,
+            string userName,
+            CancellationToken cancellationToken)
         {
-            var response = await _httpClient.GetAsync($"https://localhost:8443/api/Product/userId/{productId}", cancellationToken);
+            var response = await _httpClient.GetFromJsonAsync<GetSellerResponse>($"https://localhost:8443/api/Product/{productId}/seller", cancellationToken);
 
-            if (response.IsSuccessStatusCode)
+            if (response != null)
             {
-                var responseSellerId = await response.Content.ReadAsStringAsync(cancellationToken);
-                if (long.TryParse(responseSellerId, out long sellerId))
-                {
-                    if (sellerId == chatId)
+                    if (response.Id == chatId)
                     {
                         await botClient.SendMessage(chatId,
                             "Не можна писати самому собі",
                             cancellationToken: cancellationToken);
                         return;
                     }
-                    Chat sellerChat;
+                    /*Chat sellerChat;
                     try
                     {
-                        sellerChat = await botClient.GetChat(sellerId, cancellationToken);
+                        sellerChat = await botClient.GetChat(response.Id, cancellationToken);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError($"Не вдалося отримати дані про продавця із id {sellerId}: {ex.Message}");
+                        _logger.LogError($"Не вдалося отримати дані про продавця із id {response.Id}: {ex.Message}");
                         await botClient.SendMessage(chatId,
                             "Не вдалося отримати дані про продавця.",
                             cancellationToken: cancellationToken);
                         return;
-                    }
+                    }*/
 
-                    if (string.IsNullOrEmpty(sellerChat.Username))
+                    if (string.IsNullOrEmpty(response.Username))
                     {
                         await botClient.SendMessage(chatId,
                             "Продавець не має публічного username, тому неможливо відкрити прямий чат.",
                             cancellationToken: cancellationToken);
                         return;
                     }
-                    string directChatLink = $"https://t.me/{sellerChat.Username}";
+                    string directChatLink = $"https://t.me/{response.Username}";
 
                     var inlineKeyboard = new InlineKeyboardMarkup(new[]
                     {
@@ -280,12 +346,6 @@ namespace Flickoo.Telegram.Services
                         "Натисніть кнопку нижче, щоб перейти до профілю продавця і написати йому в особисті:",
                         replyMarkup: inlineKeyboard,
                         cancellationToken: cancellationToken);
-                }
-            }
-            else
-            {
-                _logger.LogInformation("не вдалося розпарсити ід продавця");
-                await botClient.SendMessage(chatId, "помилка", cancellationToken: cancellationToken);
             }
 
             return;
@@ -328,11 +388,19 @@ namespace Flickoo.Telegram.Services
                 return false;
             }
 
-            if (session.Price < 1)
+            if(session.PriceCurrency != "₴" && session.PriceCurrency != "$" && session.PriceCurrency != "€")
             {
-                _logger.LogWarning($"Введіть ціну(в грн) {checkTypeText}");
-                await _keyboards.SendCancelKeyboard(botClient, chatId, $"Введіть ціну (в грн) {checkTypeText}", cancellationToken: cancellationToken);
-                session.State = ProductSessionState.WaitingForPrice;
+                _logger.LogWarning($"Виберіть валюту {checkTypeText}");
+                await _keyboards.SendCurrencyKeyboard(botClient, chatId, $"Виберіть валюту\n₴ (грн)\n$ (долар)\n€ (євро) {checkTypeText}", cancellationToken: cancellationToken);
+                session.State = ProductSessionState.WaitingForPriceCurrency;
+                return false;
+            }
+
+            if (session.PriceAmount < 1)
+            {
+                _logger.LogWarning($"Введіть ціну {checkTypeText}");
+                await _keyboards.SendCancelKeyboard(botClient, chatId, $"Введіть ціну {checkTypeText}", cancellationToken: cancellationToken);
+                session.State = ProductSessionState.WaitingForPriceAmount;
                 return false;
             }
 
@@ -344,14 +412,14 @@ namespace Flickoo.Telegram.Services
                 return false;
             }
 
-            if (session.MediaUrls == null || session.MediaUrls is [])
+            if (session.MediaFiles == null || session.MediaFiles is [])
             {
                 _logger.LogWarning($"Виберіть фото продукту {checkTypeText}");
                 await _keyboards.SendMediaKeyboard(botClient, chatId, $"Виберіть фото продукту {checkTypeText}\nПОПЕРЕДЖЕННЯ!\nOбрати можна лише 5 фото/відео", cancellationToken: cancellationToken);
                 session.State = ProductSessionState.WaitingForMedia;
                 return false;
             }
-            if (session.MediaUrls.Count > 5)
+            if (session.MediaFiles.Count > 5)
             {
                 _logger.LogWarning("Можна додати лише 5 фото/відео");
                 await _keyboards.SendMediaKeyboard(botClient, chatId, "Можна додати лише 5 фото/відео!!!!", cancellationToken);
@@ -361,8 +429,8 @@ namespace Flickoo.Telegram.Services
 
             if (session.AddMoreMedia)
             {
-                _logger.LogInformation($"Додано {session.MediaUrls.Count}/5 фото");
-                await _keyboards.SendMediaKeyboard(botClient, chatId, $"Додано {session.MediaUrls.Count}/5 фото", cancellationToken);
+                _logger.LogInformation($"Додано {session.MediaFiles.Count}/5 фото");
+                await _keyboards.SendMediaKeyboard(botClient, chatId, $"Додано {session.MediaFiles.Count}/5 фото", cancellationToken);
                 session.State = ProductSessionState.WaitingForMedia;
                 return false;
             }

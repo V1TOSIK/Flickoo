@@ -7,8 +7,9 @@
         SwapingLikedProducts,
         WaitingForCategory,
         WaitingForProductName,
-        WaitingForPrice,
+        WaitingForPriceAmount,
         WaitingForDescription,
-        WaitingForMedia
+        WaitingForMedia,
+        WaitingForPriceCurrency
     }
 }

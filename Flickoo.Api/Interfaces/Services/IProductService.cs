@@ -12,7 +12,7 @@ namespace Flickoo.Api.Interfaces.Services
         Task<IEnumerable<GetProductResponse>> GetProductsByCategoryIdAsync(long categoryId);
         Task<GetProductResponse?> GetProductByIdAsync(long productId);
         Task<GetUserResponse?> GetSellerByProductIdAsync(long productId);
-        Task<bool> AddProductAsync(CreateProductRequest request);
+        Task<long> AddProductAsync(CreateProductRequest request);
         Task<bool> UpdateProductAsync(long productId, UpdateProductRequest request);
         Task<bool> DeleteProductAsync(long productId);
 

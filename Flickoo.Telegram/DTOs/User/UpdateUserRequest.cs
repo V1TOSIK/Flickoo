@@ -1,9 +1,9 @@
-﻿namespace Flickoo.Telegram.DTOs
+﻿namespace Flickoo.Telegram.DTOs.User
 {
-    public class CreateOrUpdateUserRequest
+    public class UpdateUserRequest
     {
         public long Id { get; set; }
-        public string Username { get; set; } = string.Empty;
+        public string NickName { get; set; } = string.Empty;
         public string LocationName { get; set; } = string.Empty;
         public bool Registered { get; set; }
     }

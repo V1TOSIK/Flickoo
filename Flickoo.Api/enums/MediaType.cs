@@ -3,8 +3,8 @@
     public enum MediaType
     {
         Unknown,
-        ImageJpeg,
-        ImagePng,
-        VideoMp4
+        Jpeg,
+        Png,
+        Mp4
     }
 }

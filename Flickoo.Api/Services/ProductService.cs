@@ -6,6 +6,7 @@ using Flickoo.Api.Entities;
 using Flickoo.Api.Interfaces.Repositories;
 using Flickoo.Api.Interfaces.Services;
 using Flickoo.Api.ValueObjects;
+using Telegram.Bot.Types;
 
 namespace Flickoo.Api.Services
 {
@@ -15,20 +16,20 @@ namespace Flickoo.Api.Services
         private readonly IUserRepository _userRepository;
         private readonly ILocationRepository _locationRepository;
         private readonly ICategoryRepository _categoryRepository;
-        private readonly IMediaRepository _mediaRepository;
+        private readonly IMediaService _mediaService;
         private readonly ILogger<ProductService> _logger;
         public ProductService(IProductRepository productRepository,
             IUserRepository userRepository,
             ILocationRepository locationRepository,
             ICategoryRepository categoryRepository,
-            IMediaRepository mediaRepository,
+            IMediaService mediaService,
             ILogger<ProductService> logger)
         {
             _productRepository = productRepository;
             _userRepository = userRepository;
             _locationRepository = locationRepository;
             _categoryRepository = categoryRepository;
-            _mediaRepository = mediaRepository;
+            _mediaService = mediaService;
             _logger = logger;
         }
 
@@ -63,7 +64,7 @@ namespace Flickoo.Api.Services
 
         public async Task<GetProductResponse?> GetProductByIdAsync(long productId)
         {
-            if (productId == 0)
+            if (productId < 0)
             {
                 _logger.LogError("GetProductById: Invalid product ID provided.");
                 return null;
@@ -93,7 +94,7 @@ namespace Flickoo.Api.Services
 
         public async Task<IEnumerable<GetProductResponse>> GetProductsByUserIdAsync(long userId)
         {
-            if (userId == 0)
+            if (userId < 0)
             {
                 _logger.LogError("GetProductsByUserId: Invalid user ID provided.");
                 return Enumerable.Empty<GetProductResponse>();
@@ -123,7 +124,7 @@ namespace Flickoo.Api.Services
 
         public async Task<IEnumerable<GetProductResponse>> GetProductsByCategoryIdAsync(long categoryId)
         {
-            if (categoryId == 0)
+            if (categoryId < 0)
             {
                 _logger.LogError("GetProductsByCategoryId: Invalid category ID provided.");
                 return Enumerable.Empty<GetProductResponse>();
@@ -153,7 +154,7 @@ namespace Flickoo.Api.Services
 
         public async Task<GetUserResponse?> GetSellerByProductIdAsync(long productId)
         {
-            if (productId == 0)
+            if (productId < 0)
             {
                 _logger.LogError("GetSellerByProductId: Invalid product ID provided.");
                 return null;
@@ -186,33 +187,33 @@ namespace Flickoo.Api.Services
             return response;
         }
 
-        public async Task<bool> AddProductAsync(CreateProductRequest request)
+        public async Task<long> AddProductAsync(CreateProductRequest request)
         {
             if (request == null)
             {
                 _logger.LogError("AddProduct: Product object is null.");
-                return false;
+                return -1;
             }
 
             var user = await _userRepository.GetUserByIdAsync(request.UserId);
             if (user == null)
             {
                 _logger.LogWarning($"AddProduct: User with ID {request.UserId} not found.");
-                return false;
+                return -1;
             }
-
-            var location = await _locationRepository.GetLocationByNameAsync(request.LocationName);
+            
+            var location = await _locationRepository.GetLocationByNameAsync(user.Location?.Name ?? "Unknown");
             if (location == null)
             {
-                _logger.LogWarning($"AddProduct: Location with name {request.LocationName} not found.");
-                return false;
+                _logger.LogWarning($"AddProduct: Location with name {user?.Location?.Name} not found.");
+                return -1;
             }
 
             var category = await _categoryRepository.GetCategoryByIdAsync(request.CategoryId);
             if (category == null)
             {
                 _logger.LogWarning($"AddProduct: Category with ID {request.CategoryId} not found.");
-                return false;
+                return -1;
             }
 
 
@@ -233,27 +234,15 @@ namespace Flickoo.Api.Services
             if (savedProduct == null)
             {
                 _logger.LogError("AddProduct: Failed to save product.");
-                return false;
+                return -1;
             }
-            _logger.LogInformation($"AddProduct: Product with ID {savedProduct.Id} added successfully.");
-            if (request.MediaUrls == null || !request.MediaUrls.Any())
-            {
-                _logger.LogWarning("AddProduct: No media URLs provided.");
-                return true;
-            }
-            var res = await _mediaRepository.AddProductMediasAsync(savedProduct.Id, request.MediaUrls);
-            if (!res)
-            {
-                _logger.LogError("AddProduct: Failed to save product media.");
-                return false;
-            }
-            _logger.LogInformation($"AddProduct: Product media for product ID {savedProduct.Id} added successfully.");
-            return true;
+            _logger.LogInformation($"AddProduct: Product with ID {savedProduct.Id} saved successfully.");
+            return savedProduct.Id;
         }
 
         public async Task<bool> UpdateProductAsync(long productId, UpdateProductRequest request)
         {
-            if (productId == 0)
+            if (productId < 0)
             {
                 _logger.LogError("UpdateProduct: Invalid product ID provided.");
                 return false;
@@ -281,42 +270,29 @@ namespace Flickoo.Api.Services
                 return false;
             }
             _logger.LogInformation($"UpdateProduct: Product with ID {productId} updated successfully.");
-            if (request.MediaUrls == null || !request.MediaUrls.Any())
-            {
-                _logger.LogWarning("UpdateProduct: No media URLs provided.");
-                return true;
-            }
-            var mediaUpdateResult = await _mediaRepository.UpdateProductMediasAsync(productId, request.MediaUrls);
-            if (!mediaUpdateResult)
-            {
-                _logger.LogError("UpdateProduct: Failed to update product media.");
-                return false;
-            }
-            _logger.LogInformation($"UpdateProduct: Product media for product ID {productId} updated successfully.");
             return true;
         }
 
         public async Task<bool> DeleteProductAsync(long productId)
         {
-            if (productId == 0)
+            if (productId < 0)
             {
                 _logger.LogError("DeleteProduct: Invalid product ID provided.");
                 return false;
             }
-            var deleteResult = await _productRepository.DeleteProductAsync(productId);
-            if (!deleteResult)
+            var deleteProductResult = await _productRepository.DeleteProductAsync(productId);
+            if (!deleteProductResult)
             {
                 _logger.LogError($"DeleteProduct: Failed to delete product with ID {productId}.");
                 return false;
             }
-            _logger.LogInformation($"DeleteProduct: Product with ID {productId} deleted successfully.");
-            var mediaDeleteResult = await _mediaRepository.DeleteProductMediasAsync(productId);
-            if (!mediaDeleteResult)
+            var deleteMediaResult = await _mediaService.DeleteMediaAsync(productId);
+            if (!deleteMediaResult)
             {
-                _logger.LogError($"DeleteProduct: Failed to delete media for product with ID {productId}.");
+                _logger.LogError($"DeleteProduct: Failed to delete media for product ID {productId}.");
                 return false;
             }
-            _logger.LogInformation($"DeleteProduct: Media for product with ID {productId} deleted successfully.");
+            _logger.LogInformation($"DeleteProduct: Product with ID {productId} deleted successfully.");
             return true;
         }
     }

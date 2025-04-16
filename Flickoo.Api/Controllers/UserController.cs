@@ -23,7 +23,7 @@ namespace Flickoo.Api.Controllers
         [HttpGet("{userId}")]
         public async Task<ActionResult<GetUserResponse>> GetUserByIdAsync([FromRoute] long userId)
         {
-            if (userId == 0)
+            if (userId < 0)
             {
                 _logger.LogError("GetUserByIdAsync: Invalid user ID provided.");
                 return BadRequest("Id is not valid");
@@ -46,7 +46,7 @@ namespace Flickoo.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<string>> AddUnregisteredUserAsync([FromBody] CreateUserRequest request)
         {
-            if (request.Id == 0)
+            if (request.Id < 0)
             {
                 _logger.LogError("AddUnregisteredUserAsync: Invalid user ID provided.");
                 return BadRequest("Id is not valid");
@@ -67,7 +67,7 @@ namespace Flickoo.Api.Controllers
         [HttpPost("registration")]
         public async Task<ActionResult<string>> RegisterUserAsync([FromBody] CreateUserRequest request)
         {
-            if (request.Id == 0)
+            if (request.Id < 0)
             {
                 _logger.LogError("RegisterUserAsync: Invalid user ID provided.");
                 return BadRequest("Id is not valid");
@@ -90,7 +90,7 @@ namespace Flickoo.Api.Controllers
         [HttpPut("{userId}")]
         public async Task<ActionResult<string>> UpdateUserAsync([FromRoute] long userId, [FromBody] UpdateUserRequest request)
         {
-            if (userId == 0)
+            if (userId < 0)
             {
                 _logger.LogError("UpdateUserAsync: Invalid user ID provided.");
                 return BadRequest("Id is not valid");
@@ -113,7 +113,7 @@ namespace Flickoo.Api.Controllers
         [HttpDelete("{userId}")]
         public async Task<ActionResult<string>> DeleteUserAsync([FromRoute] long userId)
         {
-            if (userId == 0)
+            if (userId < 0)
             {
                 _logger.LogError("DeleteUserAsync: Invalid user ID provided.");
                 return BadRequest("Id is not valid");

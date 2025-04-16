@@ -78,13 +78,13 @@ namespace Flickoo.Api.Repositories
             if (category == null)
             {
                 _logger.LogError("AddCategoryAsync: Category object is null.");
-                return 0;
+                return -1;
             }
 
             if (string.IsNullOrWhiteSpace(category.Name))
             {
                 _logger.LogError("AddCategoryAsync: Category name is empty.");
-                return 0;
+                return -1;
             }
 
             var existingCategory = await _dbContext.Categories
@@ -94,7 +94,7 @@ namespace Flickoo.Api.Repositories
             if (existingCategory != null)
             {
                 _logger.LogWarning($"AddCategoryAsync: Category with name {category.Name} already exists.");
-                return 0;
+                return -1;
             }
 
             await _dbContext.Categories.AddAsync(category);
@@ -110,7 +110,7 @@ namespace Flickoo.Api.Repositories
                 _logger.LogError("UpdateCategoryAsync: Category object is null.");
                 return false;
             }
-            if (category.Id <= 0)
+            if (category.Id < 0)
             {
                 _logger.LogError("UpdateCategoryAsync: Invalid category ID provided.");
                 return false;
@@ -136,7 +136,7 @@ namespace Flickoo.Api.Repositories
 
         public async Task<bool> DeleteCategoryAsync(long categoryId)
         {
-            if (categoryId <= 0)
+            if (categoryId < 0)
             {
                 _logger.LogError("DeleteCategoryAsync: Invalid category ID provided.");
                 return false;

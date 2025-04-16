@@ -1,4 +1,4 @@
-﻿namespace Flickoo.Telegram.DTOs
+﻿namespace Flickoo.Telegram.DTOs.Category
 {
     public class CategoryDto
     {

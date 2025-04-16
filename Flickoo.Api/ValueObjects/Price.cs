@@ -10,7 +10,7 @@
                 throw new ArgumentOutOfRangeException(nameof(amount), "Amount cannot be negative.");
             if (string.IsNullOrWhiteSpace(currency))
                 throw new ArgumentException("Currency cannot be null or empty.", nameof(currency));
-            if (currency.Length != 3)
+            if (currency.Length > 1)
                 throw new ArgumentException("Currency must be a 3-letter ISO code.", nameof(currency));
 
             Amount = amount;

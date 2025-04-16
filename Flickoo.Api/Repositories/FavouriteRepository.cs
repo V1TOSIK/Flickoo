@@ -24,7 +24,7 @@ namespace Flickoo.Api.Repositories
 
         public async Task<IEnumerable<Product>> GetFavouriteProductsAsync(long userId)
         {
-            if (userId == 0)
+            if (userId < 0)
             {
                 _logger.LogError("GetFavouriteProductsByUserId: Invalid user ID provided.");
                 return [];
@@ -50,7 +50,7 @@ namespace Flickoo.Api.Repositories
 
         public async Task<IEnumerable<long>> GetFavouriteProductIdsAsync(long userId)
         {
-            if (userId == 0)
+            if (userId < 0)
             {
                 _logger.LogError("GetFavouriteProductIdsByUserId: Invalid user ID provided.");
                 return [];
@@ -75,13 +75,13 @@ namespace Flickoo.Api.Repositories
 
         public async Task<bool> AddToFavouritesAsync(long userId, long productId)
         {
-            if (userId == 0)
+            if (userId < 0)
             {
                 _logger.LogError("AddToFavouritesAsync: Invalid user ID provided.");
                 return false;
             }
 
-            if (productId == 0)
+            if (productId < 0)
             {
                 _logger.LogError("AddToFavouritesAsync: Invalid product ID provided.");
                 return false;
@@ -117,12 +117,12 @@ namespace Flickoo.Api.Repositories
 
         public async Task<bool> RemoveFromFavouritesAsync(long userId, long productId)
         {
-            if (userId == 0)
+            if (userId < 0)
             {
                 _logger.LogError("RemoveFromFavouritesAsync: Invalid user ID provided.");
                 return false;
             }
-            if (productId == 0)
+            if (productId < 0)
             {
                 _logger.LogError("RemoveFromFavouritesAsync: Invalid product ID provided.");
                 return false;
@@ -154,13 +154,13 @@ namespace Flickoo.Api.Repositories
 
         public async Task<bool> IsProductInFavouritesAsync(long userId, long productId)
         {
-            if (userId == 0)
+            if (userId < 0)
             {
                 _logger.LogError("IsProductInFavouritesAsync: Invalid user ID provided.");
                 return false;
             }
 
-            if (productId == 0)
+            if (productId < 0)
             {
                 _logger.LogError("IsProductInFavouritesAsync: Invalid product ID provided.");
                 return false;
@@ -181,7 +181,7 @@ namespace Flickoo.Api.Repositories
 
         public async Task<bool> ClearFavouritesAsync(long userId)
         {
-            if (userId == 0)
+            if (userId < 0)
             {
                 _logger.LogError("ClearFavouritesAsync: Invalid user ID provided.");
                 return false;

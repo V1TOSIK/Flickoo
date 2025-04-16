@@ -15,132 +15,78 @@ namespace Flickoo.Api.Repositories
             _logger = logger;
             _dbContext = dbContext;
         }
-
-        public async Task<IEnumerable<Media>> GetMediaByProductIdAsync(long productId)
+        public async Task<IEnumerable<string?>> GetMediaUrlsAsync(long productId)
         {
-            var mediaList = await _dbContext.Medias
-                .Where(media => media.ProductId == productId)
-                .ToListAsync();
-            if (mediaList == null)
+            if (productId < 0)
             {
-                _logger.LogWarning($"GetMediaByProductIdAsync: No media found for product ID {productId}.");
-                return Enumerable.Empty<Media>();
-            }
-            else
-            {
-                _logger.LogInformation($"GetMediaByProductIdAsync: Media retrieved for product ID {productId}.");
-
-                return mediaList;
-            }
-        }
-
-        public async Task<bool> AddProductMediasAsync(long productId, List<string> mediaUrls)
-        {
-            if (mediaUrls == null || !mediaUrls.Any())
-            {
-                _logger.LogError("AddProductMediasAsync: Media URLs list is null or empty.");
-                return false;
-            }
-            foreach (var mediaUrl in mediaUrls)
-            {
-                var result = await AddMediaAsync(productId, mediaUrl);
-                if (!result)
-                {
-                    _logger.LogError($"AddProductMediasAsync: Failed to add media URL {mediaUrl} for product ID {productId}.");
-                    continue;
-                }
-            }
-            _logger.LogInformation($"AddProductMediasAsync: Media URLs added for product ID {productId}.");
-            return true;
-        }
-
-        private async Task<bool> AddMediaAsync(long productId, string mediaUrl)
-        {
-            if (string.IsNullOrEmpty(mediaUrl))
-            {
-                _logger.LogError("MediaFile is null or empty");
-                return false;
+                _logger.LogWarning("Invalid product ID provided.");
+                return Enumerable.Empty<string>();
             }
 
-            var mediaType = mediaUrl.EndsWith(".mp4") ? enums.MediaType.VideoMp4 :
-                mediaUrl.EndsWith(".jpeg") ? enums.MediaType.ImageJpeg :
-                mediaUrl.EndsWith(".png") ? enums.MediaType.ImagePng :
-                enums.MediaType.Unknown;
-
-            var product = await _dbContext.Products
+            var medias = await _dbContext.Medias
                 .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.Id == productId);
+                .Where(m => m.ProductId == productId)
+                .Select(m => m.Url)
+                .ToListAsync();
 
-            if (product == null)
+            if (medias == null || !medias.Any())
             {
-                _logger.LogWarning($"AddMediaAsync: Product with ID {productId} not found.");
-                return false;
+                _logger.LogWarning($"No media found for product ID: {productId}");
+                return Enumerable.Empty<string>();
             }
-
-            var media = new Media
-            {
-                Url = mediaUrl,
-                TypeOfMedia = mediaType,
-                ProductId = productId,
-                Product = product,
-            };
-            await _dbContext.Medias.AddAsync(media);
-            await _dbContext.SaveChangesAsync();
-            _logger.LogInformation($"AddMediaAsync: Media added for product ID {productId}.");
-            return true;
+            _logger.LogInformation($"Retrieved {medias.Count} media URLs for product ID: {productId}");
+            return medias;
         }
 
-        public async Task<bool> UpdateProductMediasAsync(long productId, List<string> mediaUrls)
+        public async Task<bool> AddMediaAsync(Media media)
         {
-            if (mediaUrls == null || !mediaUrls.Any())
+            if (media == null)
             {
-                _logger.LogError("UpdateProductMediasAsync: Media URLs list is null or empty.");
+                _logger.LogWarning("Null media object provided.");
                 return false;
             }
-            var existingMedia = await GetMediaByProductIdAsync(productId);
-            if (existingMedia == null || !existingMedia.Any())
+
+            try
             {
-                _logger.LogWarning($"UpdateProductMediasAsync: No existing media found for product ID {productId}.");
+                await _dbContext.Medias.AddAsync(media);
+                await _dbContext.SaveChangesAsync();
+                _logger.LogInformation($"Media added for product ID: {media.ProductId}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to add media");
                 return false;
             }
-            foreach (var media in existingMedia)
+        }
+
+        public async Task<bool> DeleteMediaAsync(long productId)
+        {
+            if (productId < 0)
             {
-                _dbContext.Medias.Remove(media);
-            };
-            await _dbContext.SaveChangesAsync();
-            foreach (var mediaUrl in mediaUrls)
+                _logger.LogWarning("Invalid product ID provided.");
+                return false;
+            }
+            try
             {
-                var result = await AddMediaAsync(productId, mediaUrl);
-                if (!result)
+                var deleteResult = await _dbContext.Medias
+                    .Where(m => m.ProductId == productId)
+                    .ExecuteDeleteAsync();
+
+                if (deleteResult == 0)
                 {
-                    _logger.LogError($"UpdateProductMediasAsync: Failed to update media URL {mediaUrl} for product ID {productId}.");
-                    continue;
+                    _logger.LogWarning($"No media found for product ID: {productId}");
+                    return false;
                 }
+                _logger.LogInformation($"Media deleted for product ID: {productId}");
+                return true;
             }
-            _logger.LogInformation($"UpdateProductMediasAsync: Media URLs updated for product ID {productId}.");
-            return true;
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to delete media");
+                return false;
+            }
         }
 
-        public async Task<bool> DeleteProductMediasAsync(long productId)
-        {
-            if (productId == 0)
-            {
-                _logger.LogError("DeleteProductMediasAsync: Invalid product ID provided.");
-                return false;
-            }
-            var existingMedia = await GetMediaByProductIdAsync(productId);
-            if (existingMedia == null || !existingMedia.Any())
-            {
-                _logger.LogWarning($"DeleteProductMediasAsync: No existing media found for product ID {productId}.");
-                return false;
-            }
-            foreach (var media in existingMedia)
-            {
-                _dbContext.Medias.Remove(media);
-            }
-            await _dbContext.SaveChangesAsync();
-            _logger.LogInformation($"DeleteProductMediasAsync: Media deleted for product ID {productId}.");
-            return true;
-        }
     }
 }

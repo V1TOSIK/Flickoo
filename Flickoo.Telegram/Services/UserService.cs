@@ -1,9 +1,11 @@
-﻿using Flickoo.Telegram.DTOs;
-using Flickoo.Telegram.Interfaces;
+﻿using Flickoo.Telegram.Interfaces;
 using System.Net.Http.Json;
 using Flickoo.Telegram.enums;
 using Telegram.Bot;
 using Flickoo.Telegram.SessionModels;
+using Flickoo.Telegram.DTOs.User;
+using System.Threading;
+using Telegram.Bot.Types;
 
 namespace Flickoo.Telegram.Services
 {
@@ -30,50 +32,44 @@ namespace Flickoo.Telegram.Services
                 return;
             }
 
-            var response = await _httpClient.GetAsync($"https://localhost:8443/api/User/check/{chatId}", cancellationToken);
+            var response = await _httpClient.GetFromJsonAsync<GetUserResponse>($"https://localhost:8443/api/User/{chatId}", cancellationToken);
 
-            if (response.IsSuccessStatusCode)
+            if (response != null)
             {
-                var userExists = await response.Content.ReadFromJsonAsync<bool>(cancellationToken: cancellationToken);
-
-                if (userExists)
+                if (response.Registered)
                 {
-                    var userResponse = await _httpClient.GetAsync($"https://localhost:8443/api/User/{chatId}", cancellationToken);
-                    var user = await userResponse.Content.ReadFromJsonAsync<GetUserResponse>(cancellationToken: cancellationToken);
-                    if (user != null)
-                    {
-                        _logger.LogInformation("Користувача знайдено!");
-                        await _keyboards.SendMyProfileKeyboard(botClient,
-                            chatId,
-                            user,
-                            $"Username: {user.Username}\n"
-                            + $"Location: {user.LocationName}",
-                            cancellationToken);
-                    }
+                _logger.LogInformation("Користувача знайдено!");
+                await _keyboards.SendMyProfileKeyboard(botClient,
+                    chatId,
+                    response,
+                    $"NickName: {response.Nickname}\n"
+                    + $"Location: {response.LocationName}",
+                    cancellationToken);
                 }
                 else
                 {
-                    _logger.LogWarning("Користувач не зареєстрований!");
-                    await _keyboards.SendMyProfileRegKeyboard(botClient,
-                        chatId,
-                        "Ви ще не зареєстровані." +
-                        "\nБажаєте створити акаунт?",
-                        cancellationToken);
+                _logger.LogWarning("Користувач не зареєстрований!");
+                await _keyboards.SendMyProfileRegKeyboard(botClient,
+                    chatId,
+                    "Ви ще не зареєстровані." +
+                    "\nБажаєте створити акаунт?",
+                    cancellationToken);
                 }
-
             }
             else
             {
-                _logger.LogError("Помилка при перевірці наявності користувача.");
-                await botClient.SendMessage(chatId, "Помилка при перевірці наявності користувача.",
-                    cancellationToken: cancellationToken);
+                _logger.LogWarning("Користувача не знайдено!");
+                await _keyboards.SendMainKeyboard(botClient,
+                    chatId,
+                    "Помилка при пошуку акаунта.\n",
+                    cancellationToken);
             }
-
         }
+
 
         public async Task<bool> AddUnRegisteredUser(ITelegramBotClient botClient,
             long chatId,
-            string name,
+            string username,
             CancellationToken cancellationToken)
         {
 
@@ -82,22 +78,24 @@ namespace Flickoo.Telegram.Services
                 _logger.LogError("Не вдалося отримати chatId");
                 return false;
             }
-            CreateOrUpdateUserRequest createUserRequest;
-            if (string.IsNullOrWhiteSpace(name))
+            CreateUserRequest createUserRequest;
+            if (string.IsNullOrWhiteSpace(username))
             {
-                createUserRequest = new CreateOrUpdateUserRequest
+                createUserRequest = new CreateUserRequest
                 {
                     Id = chatId,
+                    Username = "",
+                    NickName = "",
                     LocationName = "",
                     Registered = false
                 };
             }
             else
             {
-                createUserRequest = new CreateOrUpdateUserRequest
+                createUserRequest = new CreateUserRequest
                 {
                     Id = chatId,
-                    Username = name,
+                    Username = username,
                     LocationName = "",
                     Registered = false
                 };
@@ -106,13 +104,7 @@ namespace Flickoo.Telegram.Services
             var response = await _httpClient.PostAsJsonAsync("https://localhost:8443/api/User", createUserRequest, cancellationToken: cancellationToken);
             if (response.IsSuccessStatusCode)
             {
-                // не працює
-                if (response.Content.ReadAsStringAsync(cancellationToken).Result == "userExist")
-                {
-                    _logger.LogInformation($"User with Id:{chatId} already exists");
-                    return true;
-                }
-                _logger.LogInformation($"Added unregistered user with Id:{chatId} | UserName: {name} | Location: {null}");
+                _logger.LogInformation($"Added unregistered user with Id:{chatId} | UserName: {username} | Location: {null}");
                 return true;
             }
             else
@@ -133,18 +125,19 @@ namespace Flickoo.Telegram.Services
                 return session.State;
             }
 
-            var user = new CreateOrUpdateUserRequest
+            var user = new CreateUserRequest
             {
                 Id = chatId,
                 Username = session.UserName,
+                NickName = session.NickName,
                 LocationName = session.LocationName,
                 Registered = true
             };
 
-            var response = await _httpClient.PostAsJsonAsync("https://localhost:8443/api/User/register", user, cancellationToken: cancellationToken);
+            var response = await _httpClient.PostAsJsonAsync("https://localhost:8443/api/User/registration", user, cancellationToken: cancellationToken);
             if (response.IsSuccessStatusCode)
             {
-                _logger.LogInformation($"Added user with Id:{chatId} | UserName: {null} | Location: {null}");
+                _logger.LogInformation($"Added user with Id:{chatId} | UserName: {session.UserName} | Location: {session.LocationName}");
                 await _keyboards.SendMainKeyboard(botClient, chatId, "Користувача успішно додано!", cancellationToken);
             }
             else
@@ -166,10 +159,10 @@ namespace Flickoo.Telegram.Services
                 return session.State;
             }
 
-            var newUser = new CreateOrUpdateUserRequest()
+            var newUser = new UpdateUserRequest()
             {
                 Id = chatId,
-                Username = session.UserName,
+                NickName = session.NickName,
                 LocationName = session.LocationName
             };
 
@@ -196,7 +189,7 @@ namespace Flickoo.Telegram.Services
             string checkTypeText,
             CancellationToken cancellationToken)
         {
-            if (string.IsNullOrWhiteSpace(session.UserName))
+            if (string.IsNullOrWhiteSpace(session.NickName))
             {
                 await _keyboards.SendCancelKeyboard(botClient, chatId, $"Будь ласка, введіть ім'я користувача. {checkTypeText}", cancellationToken: cancellationToken);
                 session.State = UserSessionState.WaitingForUserName;

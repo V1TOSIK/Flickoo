@@ -57,6 +57,7 @@ namespace Flickoo.Telegram.Services
                     return true;
 
                 case "створити акаунт":
+                    session.UserName = command.Chat.Username ?? "";
                     session.Action = "Create";
                     session.State = await _userService.CreateAccount(botClient,
                         chatId,
@@ -101,6 +102,7 @@ namespace Flickoo.Telegram.Services
                 var session = _userSessions[chatId];
                 session.State = UserSessionState.Idle;
                 session.UserName = string.Empty;
+                session.NickName = string.Empty;
                 session.LocationName = string.Empty;
                 session.Action = string.Empty;
 
@@ -120,7 +122,7 @@ namespace Flickoo.Telegram.Services
                         await CancelAction(botClient, chatId, "Реєстрацію скасовано", cancellationToken);
                         return true;
                     }
-                    session.UserName = msg.Text ?? "";
+                    session.NickName = msg.Text ?? "";
                     session.State = await _userService.CreateAccount(botClient, chatId, session, cancellationToken);
                     return true;
 
@@ -151,7 +153,7 @@ namespace Flickoo.Telegram.Services
                         await CancelAction(botClient, chatId, "Реєстрацію скасовано", cancellationToken);
                         return true;
                     }
-                    session.UserName = msg.Text ?? "";
+                    session.NickName = msg.Text ?? "";
                     session.State = await _userService.UpdateAccount(botClient, chatId, session, cancellationToken);
                     return true;
 

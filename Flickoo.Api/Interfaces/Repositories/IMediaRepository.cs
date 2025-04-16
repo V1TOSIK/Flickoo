@@ -4,9 +4,8 @@ namespace Flickoo.Api.Interfaces.Repositories
 {
     public interface IMediaRepository
     {
-        Task<IEnumerable<Media>> GetMediaByProductIdAsync(long productId);
-        Task<bool> AddProductMediasAsync(long productId, List<string> mediaUrls);
-        Task<bool> UpdateProductMediasAsync(long productId, List<string> mediaUrls);
-        Task<bool> DeleteProductMediasAsync(long productId);
+        Task<IEnumerable<string?>> GetMediaUrlsAsync(long productId);
+        Task<bool> AddMediaAsync(Media media);
+        Task<bool> DeleteMediaAsync(long productId);
     }
 }

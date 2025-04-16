@@ -1,4 +1,4 @@
-﻿namespace Flickoo.Api.DTOs.Product.Create
+﻿namespace Flickoo.Telegram.DTOs.Product
 {
     public class CreateProductRequest
     {
@@ -8,5 +8,6 @@
         public string Description { get; set; } = string.Empty;
         public long UserId { get; set; }
         public long CategoryId { get; set; }
+        public List<Stream> MediaFiles { get; set; } = [];
     }
 }

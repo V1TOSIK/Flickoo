@@ -1,7 +1,8 @@
-﻿namespace Flickoo.Api.DTOs.Product.Create
+﻿namespace Flickoo.Telegram.DTOs.Product
 {
-    public class CreateProductRequest
+    public class UpdateProductRequest
     {
+        public long Id { get; set; }
         public string Name { get; set; } = string.Empty;
         public decimal PriceAmount { get; set; }
         public string PriceCurrency { get; set; } = string.Empty;

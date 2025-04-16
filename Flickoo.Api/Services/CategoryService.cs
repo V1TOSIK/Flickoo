@@ -40,7 +40,7 @@ namespace Flickoo.Api.Services
 
         public async Task<GetCategoryResponse?> GetCategoryByIdAsync(long categoryId)
         {
-            if (categoryId == 0)
+            if (categoryId < 0)
             {
                 _logger.LogError("GetCategoryByIdAsync: Invalid category ID provided.");
                 return null;
@@ -56,6 +56,7 @@ namespace Flickoo.Api.Services
             
             var response = new GetCategoryResponse
             {
+                Id = category.Id,
                 Name = category.Name,
             };
 
@@ -103,7 +104,7 @@ namespace Flickoo.Api.Services
             };
 
             var categoryId = await _categoryRepository.AddCategoryAsync(category);
-            if (categoryId == 0)
+            if (categoryId < 0)
             {
                 _logger.LogError("AddCategoryAsync: Failed to add category.");
                 return false;
@@ -141,7 +142,7 @@ namespace Flickoo.Api.Services
 
         public async Task<bool> DeleteCategoryAsync(long categoryId)
         {
-            if (categoryId == 0)
+            if (categoryId < 0)
             {
                 _logger.LogError("DeleteCategoryAsync: Invalid category ID provided.");
                 return false;

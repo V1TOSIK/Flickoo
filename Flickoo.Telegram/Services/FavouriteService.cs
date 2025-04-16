@@ -1,4 +1,4 @@
-﻿using Flickoo.Telegram.DTOs;
+﻿using Flickoo.Telegram.DTOs.Product;
 using Flickoo.Telegram.Interfaces;
 using System.Net.Http.Json;
 using Telegram.Bot;

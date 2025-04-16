@@ -25,8 +25,9 @@ namespace Flickoo.Api.Controllers
         }
 
         //GET
+
         #region GET
-        
+
         [HttpGet]
         public async Task<ActionResult<ICollection<GetProductResponse>>> GetAllProductsAsync()
         {
@@ -46,9 +47,9 @@ namespace Flickoo.Api.Controllers
         }
 
         [HttpGet("{productId}")]
-        public async Task<ActionResult<ICollection<GetProductResponse>>> GetByCategory([FromRoute] long productId)
+        public async Task<ActionResult<GetProductResponse?>> GetProductByIdAsync([FromRoute] long productId)
         {
-            if (productId == 0)
+            if (productId < 0)
                 return BadRequest();
 
             var product = await _productService.GetProductByIdAsync(productId);
@@ -79,67 +80,55 @@ namespace Flickoo.Api.Controllers
 
             if (products == null)
                 return NotFound();
-            
-            var productResponse = products.Select(p => new GetProductResponse()
-            {
-                Id = p.Id,
-                Name = p.Name,
-                PriceAmount = p.PriceAmount,
-                PriceCurrency = p.PriceCurrency,
-                Description = p.Description,
-                MediaUrls = p.MediaUrls
-            }).ToList();
 
-            return Ok(productResponse);
-        }
 
-        [HttpGet("category/{categoryId}")]
-        public async Task<ActionResult<ICollection<GetProductResponse>>> GetProductsByCategoryAsync([FromRoute] long categoryId)
-        {
-            if (categoryId == 0)
-                return BadRequest();
-
-            var products = await _productService.GetProductsByCategoryIdAsync(categoryId);
-
-            if (products == null)
-                return NotFound();
-
-            var productResponse = products.Select(p => new GetProductResponse()
-            {
-                Id = p.Id,
-                Name = p.Name,
-                PriceAmount = p.PriceAmount,
-                PriceCurrency = p.PriceCurrency,
-                Description = p.Description,
-                MediaUrls = p.MediaUrls
-            }).ToList();
-
-            return Ok(productResponse);
+            return Ok(products);
         }
 
         [HttpGet("{productId}/seller")]
-        public async Task<ActionResult<GetUserResponse>> GetSellerId([FromRoute] long productId)
+        public async Task<ActionResult<GetUserResponse>> GetSellerByProductIdAsync([FromRoute] long productId)
         {
-            if (productId == 0)
+            if (productId < 0)
                 return BadRequest();
-
             var response = await _productService.GetSellerByProductIdAsync(productId);
             if (response == null)
             {
                 _logger.LogError("Product not found");
                 return NotFound();
             }
-            
             _logger.LogInformation("Product found");
             return Ok(response);
         }
 
+        [HttpGet("category/{categoryId}")]
+        public async Task<ActionResult<ICollection<GetProductResponse>>> GetProductsByCategoryIdAsync([FromRoute] long categoryId)
+        {
+            if (categoryId < 0)
+                return BadRequest();
+            var products = await _productService.GetProductsByCategoryIdAsync(categoryId);
+            if (products == null)
+                return NotFound();
+            var productResponse = products.Select(p => new GetProductResponse()
+            {
+                Id = p.Id,
+                Name = p.Name,
+                PriceAmount = p.PriceAmount,
+                PriceCurrency = p.PriceCurrency,
+                Description = p.Description,
+                MediaUrls = p.MediaUrls
+            }).ToList();
+            return Ok(productResponse);
+        }
+
         #endregion
+
+
+
 
         // POST
         #region POST
         [HttpPost]
-        public async Task<ActionResult<string>> Post([FromBody] CreateProductRequest request)
+        public async Task<ActionResult<long>> Post([FromBody] CreateProductRequest request)
         {
             if (request == null)
             {
@@ -153,22 +142,16 @@ namespace Flickoo.Api.Controllers
                 return BadRequest("Error: Product is empty");
             }
 
-            if (request.MediaUrls == null)
-            {
-                _logger.LogError("MediaUrls is null");
-                return BadRequest("Error: MediaUrls is null");
-            }
-
             var response = await _productService.AddProductAsync(request);
 
-            if (!response)
+            if (response == -1)
             {
                 _logger.LogError("Product was not added");
                 return BadRequest("Error: Product was not added");
             }
 
             _logger.LogInformation("Product was added");
-            return Ok("Product was added. Successful");
+            return Ok(response);
         }
         #endregion
 
@@ -177,7 +160,7 @@ namespace Flickoo.Api.Controllers
         [HttpPut("{productId}")]
         public async Task<ActionResult<string>> UpdateProductAsync([FromRoute] long productId, [FromBody] UpdateProductRequest request)
         {
-            if (productId == 0)
+            if (productId < 0)
             {
                 _logger.LogError("Product ID is 0");
                 return BadRequest("Error: Product ID = 0");
@@ -188,14 +171,8 @@ namespace Flickoo.Api.Controllers
                 return BadRequest("Error: Product is null");
             }
 
-            if (string.IsNullOrEmpty(request.Name) && request.PriceAmount == 0 && string.IsNullOrEmpty(request.PriceCurrency) && string.IsNullOrEmpty(request.Description))
+            if (string.IsNullOrEmpty(request.Name) && request.PriceAmount < 0 && string.IsNullOrEmpty(request.PriceCurrency) && string.IsNullOrEmpty(request.Description))
                 return BadRequest("Error: Product is empty");
-
-            if (request.MediaUrls == null)
-            {
-                _logger.LogError("MediaUrls is null");
-                return BadRequest();
-            }
 
             var response = await _productService.UpdateProductAsync(productId, request);
 
@@ -206,6 +183,7 @@ namespace Flickoo.Api.Controllers
 
             return Ok("Product was updated. Successful");
         }
+
         #endregion
 
         // DELETE
@@ -213,7 +191,7 @@ namespace Flickoo.Api.Controllers
         [HttpDelete("{productId}")]
         public async Task<ActionResult<string>> DeleteProductAsync([FromRoute] long productId)
         {
-            if (productId == 0)
+            if (productId < 0)
                 return BadRequest("Error: Product ID = 0");
 
             var response = await _productService.DeleteProductAsync(productId);
@@ -224,6 +202,7 @@ namespace Flickoo.Api.Controllers
 
             return Ok("Product was deleted. Successful");
         }
+        
         #endregion
     }
 }

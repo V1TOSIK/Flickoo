@@ -19,7 +19,7 @@ namespace Flickoo.Api.Services
 
         public async Task<GetLocationNameResponse?> GetLocationByIdAsync(long locationId)
         {
-            if (locationId == 0)
+            if (locationId < 0)
             {
                 _logger.LogError("GetLocationByIdAsync: Invalid location ID provided.");
                 return null;
@@ -77,7 +77,7 @@ namespace Flickoo.Api.Services
 
         public async Task<bool> UpdateLocationAsync(long locationId, UpdateLocationRequest request)
         {
-            if (locationId == 0 || request == null)
+            if (locationId < 0 || request == null)
             {
                 _logger.LogError("UpdateLocationAsync: Invalid location ID or request provided.");
                 return false;
@@ -99,7 +99,7 @@ namespace Flickoo.Api.Services
 
         public async Task<bool> DeleteLocationAsync(long locationId)
         {
-            if (locationId == 0)
+            if (locationId < 0)
             {
                 _logger.LogError("DeleteLocationAsync: Invalid location ID provided.");
                 return false;
