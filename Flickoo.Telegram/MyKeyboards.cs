@@ -1,8 +1,9 @@
 ﻿using Telegram.Bot.Types.ReplyMarkups;
 using Telegram.Bot;
 using Flickoo.Telegram.Interfaces;
-using Flickoo.Telegram.DTOs;
 using System.Net.Http.Json;
+using Flickoo.Telegram.DTOs.User;
+using Flickoo.Telegram.DTOs.Category;
 
 namespace Flickoo.Telegram
 {
@@ -116,7 +117,7 @@ namespace Flickoo.Telegram
         public async Task SendCategoriesInlineButtons(ITelegramBotClient botClient, long chatId, string messageText, bool withAllCategoryButton, CancellationToken cancellationToken)
         {
             List<CategoryDto> categories = [];
-            var response = await _httpClient.GetAsync("https://localhost:8443/api/Product/category", cancellationToken);
+            var response = await _httpClient.GetAsync("https://localhost:8443/api/Category", cancellationToken);
             if (response.IsSuccessStatusCode)
             {
                 categories = await response.Content.ReadFromJsonAsync<List<CategoryDto>>(cancellationToken: cancellationToken) ?? [];
@@ -182,6 +183,22 @@ namespace Flickoo.Telegram
                 OneTimeKeyboard = false
             };
             await botClient.SendMessage(chatId, messageText, replyMarkup: cancelKeyboard, cancellationToken: cancellationToken);
+        }
+
+        public async Task SendCurrencyKeyboard(ITelegramBotClient botClient, long chatId, string messageText, CancellationToken cancellationToken)
+        {
+            var currencyKeyboard = new ReplyKeyboardMarkup(new[]
+            {
+                new KeyboardButton("₴"),
+                new KeyboardButton("$"),
+                new KeyboardButton("€"),
+                new KeyboardButton("назад")
+            })
+            {
+                ResizeKeyboard = true,
+                OneTimeKeyboard = false
+            };
+            await botClient.SendMessage(chatId, messageText, replyMarkup: currencyKeyboard, cancellationToken: cancellationToken);
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using Flickoo.Telegram.DTOs;
+﻿using Flickoo.Telegram.DTOs.Product;
 using Telegram.Bot;
 
 namespace Flickoo.Telegram.Interfaces

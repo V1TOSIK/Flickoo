@@ -86,7 +86,7 @@ namespace Flickoo.Telegram.Services
                 case "додати продукт":
                     
                     session.Action = "add";
-                    session.State = await _productService.AddProduct(botClient, chatId, session, cancellationToken);
+                    session.State = await _productService.AddProductAsync(botClient, chatId, session, cancellationToken);
 
                     if (session.State == ProductSessionState.Idle)
                         ResetSession(chatId);
@@ -114,22 +114,27 @@ namespace Flickoo.Telegram.Services
 
                 case ProductSessionState.WaitingForProductName:
                     session.Name = msg.Text ?? "";
-                    session.State = await _productService.AddProduct(botClient, chatId, session, cancellationToken);
+                    session.State = await _productService.AddProductAsync(botClient, chatId, session, cancellationToken);
                     return true;
 
-                case ProductSessionState.WaitingForPrice:
-                    if (!decimal.TryParse(msg.Text, out var price))
+                case ProductSessionState.WaitingForPriceCurrency:
+                    session.PriceCurrency = msg.Text ?? "";
+                    session.State = await _productService.AddProductAsync(botClient, chatId, session, cancellationToken);
+                    return true;
+
+                case ProductSessionState.WaitingForPriceAmount:
+                    if (!decimal.TryParse(msg.Text, out var priceAmount))
                     {
                         await botClient.SendMessage(chatId, "Ціна повинна бути числом", cancellationToken: cancellationToken);
                         return true;
                     }
-                    session.Price = price;
-                    session.State = await _productService.AddProduct(botClient, chatId, session, cancellationToken);
+                    session.PriceAmount = priceAmount;
+                    session.State = await _productService.AddProductAsync(botClient, chatId, session, cancellationToken);
                     return true;
 
                 case ProductSessionState.WaitingForDescription:
                     session.ProductDescription = msg.Text ?? "";
-                    session.State = await _productService.AddProduct(botClient, chatId, session, cancellationToken);
+                    session.State = await _productService.AddProductAsync(botClient, chatId, session, cancellationToken);
                     return true;
 
                 case ProductSessionState.WaitingForMedia:
@@ -141,34 +146,39 @@ namespace Flickoo.Telegram.Services
                         return true;
                     }
 
-                    if (session.MediaUrls.Count > 5)
-                    {
-                        session.MediaUrls.RemoveRange(5, session.MediaUrls.Count - 5);
-                    }
-
                     if (msg.Text == "надіслати фото заново")
                     {
                         await _keyboards.SendMediaKeyboard(botClient, chatId, "Повторне надсилання фото/відео", cancellationToken: cancellationToken);
                         _logger.LogInformation("Повторне надсилання фото/відео");
-                        session.MediaUrls.Clear();
+                        session.MediaFiles.Clear();
+                        session.MediaTypes.Clear();
                         return true;
                     }
 
                     if (msg.Text == "готово")
                     {
-                        if (session.MediaUrls.Count == 0)
+                        if (session.MediaFiles.Count == 0)
                         {
                             await _keyboards.SendMediaKeyboard(botClient, chatId, "Ви не надіслали жодного фото/відео", cancellationToken: cancellationToken);
                             return true;
                         }
                         session.AddMoreMedia = false;
-                        session.State = await _productService.AddProduct(botClient, chatId, session, cancellationToken);
+                        session.State = await _productService.AddProductAsync(botClient, chatId, session, cancellationToken);
                         ResetSession(chatId);
                         return true;
                     }
 
-                    session.MediaUrls.Add(await _mediaService.GetMediaIdFromMsg(botClient, msg, chatId, cancellationToken));
-                    session.State = await _productService.AddProduct(botClient, chatId, session, cancellationToken);
+                    session.MediaFiles.Add(await _mediaService.GetMediaFileFromMsgAsync(botClient, msg, chatId, cancellationToken));
+                    session.MediaTypes.Add(_mediaService.GetMediaTypeFromMsgAsync(msg, cancellationToken));
+
+                    if (session.MediaFiles.Count > 5)
+                    {
+                        session.MediaFiles.RemoveRange(5, session.MediaFiles.Count - 5);
+                        session.MediaTypes.RemoveRange(5, session.MediaTypes.Count - 5);
+                    }
+
+
+                    session.State = await _productService.AddProductAsync(botClient, chatId, session, cancellationToken);
 
                     return true;
 
@@ -196,13 +206,18 @@ namespace Flickoo.Telegram.Services
                     session.State = await _productService.UpdateProduct(botClient, chatId, session, cancellationToken);
                     return true;
 
-                case ProductSessionState.WaitingForPrice:
+                case ProductSessionState.WaitingForPriceCurrency:
+                    session.PriceCurrency = msg.Text ?? "";
+                    session.State = await _productService.UpdateProduct(botClient, chatId, session, cancellationToken);
+                    return true;
+
+                case ProductSessionState.WaitingForPriceAmount:
                     if (!decimal.TryParse(msg.Text, out var updatePrice))
                     {
                         await botClient.SendMessage(chatId, "Ціна повинна бути числом", cancellationToken: cancellationToken);
                         return true;
                     }
-                    session.Price = updatePrice;
+                    session.PriceAmount = updatePrice;
                     session.State = await _productService.UpdateProduct(botClient, chatId, session, cancellationToken);
                     return true;
 
@@ -214,31 +229,25 @@ namespace Flickoo.Telegram.Services
 
                 case ProductSessionState.WaitingForMedia:
 
-                    if (msg.Type != MessageType.Photo && msg.Type != MessageType.Video)
+                    if (msg.Type != MessageType.Photo && msg.Type != MessageType.Video && string.IsNullOrEmpty(msg.Text))
                     {
                         _logger.LogWarning("Ви скинули не фото/відео");
                         await _keyboards.SendMainKeyboard(botClient, chatId, "ви скинули не фото/відео", cancellationToken);
                         return true;
                     }
 
-                    if (session.MediaUrls.Count >= 5)
-                    {
-                        session.MediaUrls.RemoveRange(5, session.MediaUrls.Count - 5);
-                        
-                    }
-
                     if (msg.Text == "надіслати фото заново")
                     {
                         await _keyboards.SendMediaKeyboard(botClient, chatId, "Повторне надсилання фото/відео", cancellationToken: cancellationToken);
                         _logger.LogInformation("Повторне надсилання фото/відео");
-                        session.MediaUrls.Clear();
-                        session.State = await _productService.UpdateProduct(botClient, chatId, session, cancellationToken);
+                        session.MediaFiles.Clear();
+                        session.MediaTypes.Clear();
                         return true;
                     }
 
                     if (msg.Text == "готово")
                     {
-                        if (session.MediaUrls.Count == 0)
+                        if (session.MediaFiles.Count == 0)
                         {
                             await _keyboards.SendMediaKeyboard(botClient, chatId, "Ви не надіслали жодного фото/відео", cancellationToken: cancellationToken);
                             return true;
@@ -250,7 +259,15 @@ namespace Flickoo.Telegram.Services
                         return true;
                     }
 
-                    session.MediaUrls.Add(await _mediaService.GetMediaIdFromMsg(botClient, msg, chatId, cancellationToken));
+                    session.MediaFiles.Add(await _mediaService.GetMediaFileFromMsgAsync(botClient, msg, chatId, cancellationToken));
+                    session.MediaTypes.Add(_mediaService.GetMediaTypeFromMsgAsync(msg, cancellationToken));
+
+                    if (session.MediaFiles.Count >= 5)
+                    {
+                        session.MediaFiles.RemoveRange(5, session.MediaFiles.Count - 5);
+                        session.MediaTypes.RemoveRange(5, session.MediaTypes.Count - 5);
+                    }
+
                     session.State = await _productService.UpdateProduct(botClient, chatId, session, cancellationToken);
 
                     return true;
@@ -277,13 +294,13 @@ namespace Flickoo.Telegram.Services
                 InlineKeyboardButton.WithCallbackData("💬", $"write_{product.Id}"),
                 InlineKeyboardButton.WithCallbackData("👎", $"delliked_{product.Id}")
             });
-            var mediaList = await _mediaService.GetMediaGroup(botClient, product.MediaUrls, cancellationToken);
+            var mediaList = await _mediaService.GetMediaFromUrlsByProductIdAsync(botClient, product.Id, cancellationToken);
 
 
 
             string productText = $"📢 {product.Name}\n" +
-                         $"💰 {product.Price} грн\n" +
-                         /*$"📍 Локація: {product.Location}\n" +*/
+                         $"💰 {product.PriceAmount} {product.PriceCurrency}\n" +
+                         $"📍 {product.LocationName}\n" +
                          $"──────────────────────────\n" +
                          $"📜 Опис: {product.Description}";
 
@@ -330,11 +347,11 @@ namespace Flickoo.Telegram.Services
                 InlineKeyboardButton.WithCallbackData("👎", $"dislike_{product.Id}")
             });
 
-            var mediaList = await _mediaService.GetMediaGroup(botClient, product.MediaUrls, cancellationToken);
+            var mediaList = await _mediaService.GetMediaFromUrlsByProductIdAsync(botClient, product.Id, cancellationToken);
 
             string productText = $"📢 {product.Name}\n" +
-                         $"💰 {product.Price} грн\n" +
-                         /*$"📍 Локація: {product.Location}\n" +*/
+                         $"💰 {product.PriceAmount} {product.PriceCurrency}\n" +
+                         $"📍 {product.LocationName}\n" +
                          $"──────────────────────────\n" +
                          $"📜 Опис: {product.Description}";
 
@@ -381,9 +398,12 @@ namespace Flickoo.Telegram.Services
                 var session = _productSessions[chatId];
                 session.State = ProductSessionState.Idle;
                 session.ProductId = 0;
+                session.MediaFiles.Clear();
+                session.MediaTypes.Clear();
                 session.MediaUrls.Clear();
                 session.Name = string.Empty;
-                session.Price = 0m;
+                session.PriceAmount = 0m;
+                session.PriceCurrency = string.Empty;
                 session.ProductDescription = string.Empty;
                 session.CategoryId = 0;
                 session.AddMoreMedia = true;
@@ -491,7 +511,7 @@ namespace Flickoo.Telegram.Services
                     {
                         case ProductSessionState.WaitingForCategory:
                             session.CategoryId = int.Parse(callbackQuery.Data);
-                            session.State = await _productService.AddProduct(botClient,
+                            session.State = await _productService.AddProductAsync(botClient,
                                 chatId,
                                 session,
                                 cancellationToken);
@@ -510,6 +530,6 @@ namespace Flickoo.Telegram.Services
                     return false;
 
             }
-        }
+        }  
     }
 }

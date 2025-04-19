@@ -1,8 +1,8 @@
-﻿using Flickoo.Api.Data;
-using Flickoo.Api.DTOs;
-using Flickoo.Api.Entities;
+﻿using Flickoo.Api.DTOs.User.Create;
+using Flickoo.Api.DTOs.User.Get;
+using Flickoo.Api.DTOs.User.Update;
+using Flickoo.Api.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace Flickoo.Api.Controllers
 {
@@ -10,198 +10,126 @@ namespace Flickoo.Api.Controllers
     [ApiController]
     public class UserController : ControllerBase
     {
-        private readonly FlickooDbContext _dBContext;
-        public UserController(FlickooDbContext dBContext)
+        private readonly ILogger<UserController> _logger;
+        private readonly IUserService _userService;
+        public UserController(ILogger<UserController> logger,
+            IUserService userService)
         {
-            _dBContext = dBContext;
+            _logger = logger;
+            _userService = userService;
         }
-
-        [HttpGet("{id}")]
-        public async Task<ActionResult<User>> GetUserById([FromRoute] long id)
+        // GET
+        #region GET
+        [HttpGet("{userId}")]
+        public async Task<ActionResult<GetUserResponse>> GetUserByIdAsync([FromRoute] long userId)
         {
-            var findUser = await _dBContext.Users
-                .AsNoTracking()
-                .Include(u => u.Location)
-                .FirstOrDefaultAsync(u => u.Id == id);
-
-            if (findUser == null)
-                return NotFound();
-
-            var response = new GetUserResponse
+            if (userId < 0)
             {
-                Username = findUser.Username,
-                LocationName = findUser.Location.Name
-            };
+                _logger.LogError("GetUserByIdAsync: Invalid user ID provided.");
+                return BadRequest("Id is not valid");
+            }
 
+            var response = await _userService.GetUserByIdAsync(userId);
+            if (response == null)
+            {
+                _logger.LogWarning($"GetUserByIdAsync: User with ID {userId} not found.");
+                return NotFound("User not found");
+            }
+            
+            _logger.LogInformation($"GetUserByIdAsync: User with ID {userId} retrieved successfully.");
             return Ok(response);
         }
+        #endregion
 
-        [HttpGet("check/{id}")]
-        public async Task<ActionResult<bool>> CheckUser([FromRoute] long id)
-        {
-            if (id == 0) return BadRequest("Id is not valid");
-
-            var userExists = await _dBContext.Users.AnyAsync(u => u.Id == id && u.Registered == true);
-
-            return Ok(userExists);
-        }
-
-        [HttpGet("myProducts/{id}")]
-        public async Task<ActionResult<ICollection<Product>>> GetUserProducts([FromRoute] long id)
-        {
-            var productList = await _dBContext.Products
-                .Where(p => p.UserId == id)
-                .AsNoTracking()
-                .OrderBy(p => p.CreatedAt)
-                .ToListAsync();
-            return Ok(productList);
-        }
-
+        // POST
+        #region POST
         [HttpPost]
-        public async Task<ActionResult<string>> Post([FromBody] CreateOrUpdateUserRequest request)
+        public async Task<ActionResult<string>> AddUnregisteredUserAsync([FromBody] CreateUserRequest request)
         {
-            if (request.Id == 0)
+            if (request.Id < 0)
+            {
+                _logger.LogError("AddUnregisteredUserAsync: Invalid user ID provided.");
                 return BadRequest("Id is not valid");
-
-            var userExists = await _dBContext.Users.AnyAsync(u => u.Id == request.Id);
-
-            if (userExists)
-                return Ok("userExist");
-
-            if (string.IsNullOrEmpty(request.Username))
-                return BadRequest("Username is null or empty");
-
-            var locationExists = await _dBContext.Locations
-                .FirstOrDefaultAsync(l => l.Name == request.LocationName);
-
-            long locationId;
-            if (locationExists == null)
-            {
-                var newLocation = new Location
-                {
-                    Name = request.LocationName
-                };
-                await _dBContext.Locations.AddAsync(newLocation);
-                await _dBContext.SaveChangesAsync();
-                locationId = newLocation.Id;
-            }
-            else
-            {
-                locationId = locationExists.Id;
             }
 
+            var response = await _userService.AddUnregisteredUserAsync(request);
 
-            if (!userExists)
+            if (response == false)
             {
-                var newUnRegisteredUser = new User
-                {
-                    Id = request.Id,
-                    Username = request.Username,
-                    LocationId = locationId,
-                    Registered = false
-                };
-                await _dBContext.Users.AddAsync(newUnRegisteredUser);
-                await _dBContext.SaveChangesAsync();
-                return Ok($"OK, user with name: {newUnRegisteredUser.Username} and id: {newUnRegisteredUser.Id} was added to notRegistered");
+                _logger.LogError("AddUnregisteredUserAsync: Failed to add user.");
+                return BadRequest("Bad Request");
             }
 
-            return Ok("Finish anyone check not do");
-
+            _logger.LogInformation($"AddUnregisteredUserAsync: User with ID {request.Id} added successfully.");
+            return Ok("OK, user was added to notRegistered");
         }
 
-        [HttpPost("register")]
-        public async Task<ActionResult> Register([FromBody] CreateOrUpdateUserRequest request)
+        [HttpPost("registration")]
+        public async Task<ActionResult<string>> RegisterUserAsync([FromBody] CreateUserRequest request)
         {
-            if (request.Id == 0)
+            if (request.Id < 0)
+            {
+                _logger.LogError("RegisterUserAsync: Invalid user ID provided.");
                 return BadRequest("Id is not valid");
-
-            var userFromDb = await _dBContext.Users.FirstOrDefaultAsync(u => u.Id == request.Id);
-
-            if (userFromDb == null)
-                return NotFound("User not found");
-
-            if (userFromDb.Registered)
-                return BadRequest("User is already registered");
-
-            var locationExists = await _dBContext.Locations
-                 .FirstOrDefaultAsync(l => l.Name == request.LocationName);
-
-            long locationId;
-            if (locationExists == null)
-            {
-                var newLocation = new Location
-                {
-                    Name = request.LocationName
-                };
-                await _dBContext.Locations.AddAsync(newLocation);
-                await _dBContext.SaveChangesAsync();
-                locationId = newLocation.Id;
-            }
-            else
-            {
-                locationId = locationExists.Id;
             }
 
-            userFromDb.Username = request.Username;
-            userFromDb.LocationId = locationId;
-            userFromDb.Registered = true;
+            var response = await _userService.RegisterUserAsync(request);
+            if (response == false)
+            {
+                _logger.LogError("RegisterUserAsync: Failed to register user.");
+                return BadRequest("Bad Request");
+            }
 
-            await _dBContext.SaveChangesAsync();
-            return Ok();
+            _logger.LogInformation($"RegisterUserAsync: User with ID {request.Id} registered successfully.");
+            return Ok("Ok, user was registered");
         }
+        #endregion
 
-
-
-        [HttpPut("{id}")]
-        public async Task<ActionResult> Put([FromBody] CreateOrUpdateUserRequest updateUser)
+        // PUT
+        #region PUT
+        [HttpPut("{userId}")]
+        public async Task<ActionResult<string>> UpdateUserAsync([FromRoute] long userId, [FromBody] UpdateUserRequest request)
         {
-            var userExists = await _dBContext.Users
-                .Include(user => user.Location)
-                .FirstOrDefaultAsync(u => u.Id == updateUser.Id);
+            if (userId < 0)
+            {
+                _logger.LogError("UpdateUserAsync: Invalid user ID provided.");
+                return BadRequest("Id is not valid");
+            }
             
-            if (userExists == null)
-                return NotFound("User not found");
-
-            if (!string.IsNullOrEmpty(updateUser.Username))
+            var response = await _userService.UpdateUserAsync(userId, request);
+            if (response == false)
             {
-                userExists.Username = updateUser.Username;
+                _logger.LogError("UpdateUserAsync: Failed to update user.");
+                return BadRequest("Bad Request");
             }
 
-            if (!string.IsNullOrEmpty(updateUser.LocationName))
-            {
-                var existingLocation = await _dBContext.Locations
-                    .FirstOrDefaultAsync(l => l.Name == updateUser.LocationName);
-
-                if (existingLocation == null)
-                {
-                    var newLocation = new Location
-                    {
-                        Name = updateUser.LocationName
-                    };
-                    await _dBContext.Locations.AddAsync(newLocation);
-                    await _dBContext.SaveChangesAsync();
-                    userExists.LocationId = newLocation.Id;
-                }
-                else
-                {
-                    userExists.LocationId = existingLocation.Id;
-                }
-            }
-            await _dBContext.SaveChangesAsync();
-            return Ok();
+            _logger.LogInformation($"UpdateUserAsync: User with ID {userId} updated successfully.");
+            return Ok("User was updated successful");
         }
+        #endregion
 
-        [HttpDelete("{id}")]
-        public async Task<ActionResult> Delete(long id)
+        // DELETE
+        #region DELETE
+        [HttpDelete("{userId}")]
+        public async Task<ActionResult<string>> DeleteUserAsync([FromRoute] long userId)
         {
-            var findUser = await _dBContext.Users.AnyAsync(u => u.Id == id);
-            if (!findUser)
-                return NotFound("User not found");
- 
-            await _dBContext.Users
-                .Where(u => u.Id == id)
-                .ExecuteDeleteAsync();
+            if (userId < 0)
+            {
+                _logger.LogError("DeleteUserAsync: Invalid user ID provided.");
+                return BadRequest("Id is not valid");
+            }
+            
+            var response = await _userService.DeleteUserAsync(userId);
+
+            if (response == false)
+            {
+                _logger.LogError("DeleteUserAsync: Failed to delete user.");
+                return BadRequest("Bad Request");
+            }
+
+            _logger.LogInformation($"DeleteUserAsync: User with ID {userId} deleted successfully.");
             return NoContent();
         }
+        #endregion
     }
 }

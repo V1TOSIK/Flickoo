@@ -48,7 +48,9 @@ namespace Flickoo.Telegram
             await cts.CancelAsync();
         }
 
-        private async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+        private async Task HandleUpdateAsync(ITelegramBotClient botClient,
+            Update update,
+            CancellationToken cancellationToken)
         {
             await (update switch
             {
@@ -58,7 +60,9 @@ namespace Flickoo.Telegram
             });
         }
 
-        private async Task OnMessage(ITelegramBotClient botClient, Message msg, CancellationToken cancellationToken)
+        private async Task OnMessage(ITelegramBotClient botClient,
+            Message msg,
+            CancellationToken cancellationToken)
         {
             var chatId = msg.Chat.Id;
             var userName = msg.From?.Username ?? "Unknown";
@@ -139,7 +143,9 @@ namespace Flickoo.Telegram
             }
         }
         
-        private async Task OnCallbackQuery(ITelegramBotClient botClient, CallbackQuery callbackQuery, CancellationToken cancellationToken)
+        private async Task OnCallbackQuery(ITelegramBotClient botClient,
+            CallbackQuery callbackQuery,
+            CancellationToken cancellationToken)
         {
             if (callbackQuery.Message == null)
             {
@@ -167,7 +173,10 @@ namespace Flickoo.Telegram
                 await botClient.SendMessage(update.Message.Chat.Id, "Unknown update type");
         }
 
-        private async Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, HandleErrorSource source, CancellationToken cancellationToken)
+        private async Task HandleErrorAsync(ITelegramBotClient botClient,
+            Exception exception,
+            HandleErrorSource source,
+            CancellationToken cancellationToken)
         {
             _logger.LogInformation("HandleError: {Exception}", exception);
             if (exception is RequestException)
