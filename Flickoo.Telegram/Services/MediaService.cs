@@ -20,41 +20,16 @@ namespace Flickoo.Telegram.Services
             _logger = logger;
         }
 
-        public string GetMediaTypeFromMsgAsync(ITelegramBotClient botClient,
-            Message msg,
-            long chatId,
+        public string GetMediaTypeFromMsgAsync(Message msg,
             CancellationToken cancellationToken)
         {
-            var fileId = msg.Type switch
+            return msg.Type switch
             {
-                MessageType.Photo => msg?.Photo?.Last().FileId,
-                MessageType.Video => msg?.Video?.FileId,
-                MessageType.Audio => msg?.Audio?.FileId,
+                MessageType.Photo => "image/jpeg",
+                MessageType.Video => "video/mp4",
+                MessageType.Audio => "audio/mpeg",
                 _ => throw new NotSupportedException($"Message type {msg.Type} is not supported")
             };
-
-            if (string.IsNullOrEmpty(fileId))
-            {
-                _logger.LogWarning("File ID is null or empty");
-                return string.Empty;
-            }
-
-            if (fileId.EndsWith(".jpg"))
-            {
-                return "image/jpeg";
-            }
-            else if (fileId.EndsWith(".png"))
-            {
-                return "image/png";
-            }
-            else if (fileId.EndsWith(".mp4"))
-            {
-                return "video/mp4";
-            }
-            else
-            {
-                return string.Empty;
-            }
         }
 
 
@@ -68,12 +43,19 @@ namespace Flickoo.Telegram.Services
                 _logger.LogWarning("Message is null");
                 throw new ArgumentNullException(nameof(msg));
             }
+            if (msg.Type == MessageType.Text)
+            {
+                _logger.LogWarning("Message type is text");
+                throw new NotSupportedException("Text messages are not supported");
+            }
+
 
             var fileId = msg.Type switch
             {
                 MessageType.Photo => msg?.Photo?.Last().FileId,
                 MessageType.Video => msg?.Video?.FileId,
                 MessageType.Audio => msg?.Audio?.FileId,
+                MessageType.Text => msg.Text,
                 _ => throw new NotSupportedException($"Message type {msg.Type} is not supported")
             };
 
@@ -90,13 +72,12 @@ namespace Flickoo.Telegram.Services
             return fileStream;
         }
 
-        public async Task<bool> UploadMediasAsync(ITelegramBotClient botClient,
-            IEnumerable<MediaRequest> mediaRequests,
-            IEnumerable<string> mediaTypes,
+        public async Task<bool> UploadMediaAsync(ITelegramBotClient botClient,
+            MediaRequest mediaRequest,
             long productId,
             CancellationToken cancellationToken)
         {
-            if (mediaRequests == null || !mediaRequests.Any())
+            if (mediaRequest == null)
             {
                 _logger.LogError("mediaRequest is null or empty");
                 return false;
@@ -104,12 +85,10 @@ namespace Flickoo.Telegram.Services
 
             using var content = new MultipartFormDataContent();
 
-            foreach (var media in mediaRequests)
-            {
-                var streamContent = new StreamContent(media.FileStream);
-                streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
-                content.Add(streamContent, "files", media.FileName);
-            }
+            var streamContent = new StreamContent(mediaRequest.FileStream);
+            content.Add(streamContent, "file", mediaRequest.FileName);
+            content.Add(new StringContent(mediaRequest.FileName), "fileName");
+            content.Add(new StringContent(mediaRequest.ContentType), "contentType");
 
             var response = await _httpClient.PostAsync($"https://localhost:8443/api/Media/{productId}", content, cancellationToken);
 
@@ -121,30 +100,11 @@ namespace Flickoo.Telegram.Services
             }
             else
             {
-                _logger.LogError($"Failed to upload media for product ID {productId}. Status code: {response.StatusCode}");
+                _logger.LogError($"Failed to upload media for product ID {productId}. Status code: {response.StatusCode}, {response.RequestMessage}");
                 return false;
             }
         }
 
-        public async Task<bool> UpdateProductMediasAsync(ITelegramBotClient botClient, IEnumerable<MediaRequest> mediaRequests, long productId, CancellationToken cancellationToken)
-        {
-            if (mediaRequests == null)
-            {
-                _logger.LogError("mediaRequest is null");
-                return false;
-            }
-            var response = await _httpClient.PutAsJsonAsync($"https://localhost:8443/api/Media/{productId}", mediaRequests, cancellationToken);
-            if (response.IsSuccessStatusCode)
-            {
-                _logger.LogInformation($"Media for product ID {productId} updated successfully.");
-                return true;
-            }
-            else
-            {
-                _logger.LogError($"Failed to update media for product ID {productId}. Status code: {response.StatusCode}");
-                return false;
-            }
-        }
 
         public async Task<List<IAlbumInputMedia>> GetMediaFromUrlsByProductIdAsync(ITelegramBotClient botClient,
             long productId,

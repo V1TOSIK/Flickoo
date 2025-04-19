@@ -11,7 +11,7 @@
         public long ProductId { get; set; }
         public DateTime CreatedAt { get; set; }
 
-        public required User User { get; set; }
-        public required Product Product { get; set; }
+        public User? User { get; set; }
+        public Product? Product { get; set; }
     }
 }

@@ -146,16 +146,12 @@ namespace Flickoo.Telegram.Services
                         return true;
                     }
 
-                    if (session.MediaFiles.Count > 5)
-                    {
-                        session.MediaFiles.RemoveRange(5, session.MediaFiles.Count - 5);
-                    }
-
                     if (msg.Text == "надіслати фото заново")
                     {
                         await _keyboards.SendMediaKeyboard(botClient, chatId, "Повторне надсилання фото/відео", cancellationToken: cancellationToken);
                         _logger.LogInformation("Повторне надсилання фото/відео");
                         session.MediaFiles.Clear();
+                        session.MediaTypes.Clear();
                         return true;
                     }
 
@@ -173,7 +169,15 @@ namespace Flickoo.Telegram.Services
                     }
 
                     session.MediaFiles.Add(await _mediaService.GetMediaFileFromMsgAsync(botClient, msg, chatId, cancellationToken));
-                    session.MediaTypes.Add(_mediaService.GetMediaTypeFromMsgAsync(botClient, msg, chatId, cancellationToken));
+                    session.MediaTypes.Add(_mediaService.GetMediaTypeFromMsgAsync(msg, cancellationToken));
+
+                    if (session.MediaFiles.Count > 5)
+                    {
+                        session.MediaFiles.RemoveRange(5, session.MediaFiles.Count - 5);
+                        session.MediaTypes.RemoveRange(5, session.MediaTypes.Count - 5);
+                    }
+
+
                     session.State = await _productService.AddProductAsync(botClient, chatId, session, cancellationToken);
 
                     return true;
@@ -225,17 +229,11 @@ namespace Flickoo.Telegram.Services
 
                 case ProductSessionState.WaitingForMedia:
 
-                    if (msg.Type != MessageType.Photo && msg.Type != MessageType.Video)
+                    if (msg.Type != MessageType.Photo && msg.Type != MessageType.Video && string.IsNullOrEmpty(msg.Text))
                     {
                         _logger.LogWarning("Ви скинули не фото/відео");
                         await _keyboards.SendMainKeyboard(botClient, chatId, "ви скинули не фото/відео", cancellationToken);
                         return true;
-                    }
-
-                    if (session.MediaFiles.Count >= 5)
-                    {
-                        session.MediaFiles.RemoveRange(5, session.MediaFiles.Count - 5);
-                        
                     }
 
                     if (msg.Text == "надіслати фото заново")
@@ -243,7 +241,7 @@ namespace Flickoo.Telegram.Services
                         await _keyboards.SendMediaKeyboard(botClient, chatId, "Повторне надсилання фото/відео", cancellationToken: cancellationToken);
                         _logger.LogInformation("Повторне надсилання фото/відео");
                         session.MediaFiles.Clear();
-                        session.State = await _productService.UpdateProduct(botClient, chatId, session, cancellationToken);
+                        session.MediaTypes.Clear();
                         return true;
                     }
 
@@ -262,6 +260,14 @@ namespace Flickoo.Telegram.Services
                     }
 
                     session.MediaFiles.Add(await _mediaService.GetMediaFileFromMsgAsync(botClient, msg, chatId, cancellationToken));
+                    session.MediaTypes.Add(_mediaService.GetMediaTypeFromMsgAsync(msg, cancellationToken));
+
+                    if (session.MediaFiles.Count >= 5)
+                    {
+                        session.MediaFiles.RemoveRange(5, session.MediaFiles.Count - 5);
+                        session.MediaTypes.RemoveRange(5, session.MediaTypes.Count - 5);
+                    }
+
                     session.State = await _productService.UpdateProduct(botClient, chatId, session, cancellationToken);
 
                     return true;
@@ -294,7 +300,7 @@ namespace Flickoo.Telegram.Services
 
             string productText = $"📢 {product.Name}\n" +
                          $"💰 {product.PriceAmount} {product.PriceCurrency}\n" +
-                         $"📍 Локація: {product.LocationName}\n" +
+                         $"📍 {product.LocationName}\n" +
                          $"──────────────────────────\n" +
                          $"📜 Опис: {product.Description}";
 
@@ -345,7 +351,7 @@ namespace Flickoo.Telegram.Services
 
             string productText = $"📢 {product.Name}\n" +
                          $"💰 {product.PriceAmount} {product.PriceCurrency}\n" +
-                         $"📍 Локація: {product.LocationName}\n" +
+                         $"📍 {product.LocationName}\n" +
                          $"──────────────────────────\n" +
                          $"📜 Опис: {product.Description}";
 
@@ -393,6 +399,7 @@ namespace Flickoo.Telegram.Services
                 session.State = ProductSessionState.Idle;
                 session.ProductId = 0;
                 session.MediaFiles.Clear();
+                session.MediaTypes.Clear();
                 session.MediaUrls.Clear();
                 session.Name = string.Empty;
                 session.PriceAmount = 0m;

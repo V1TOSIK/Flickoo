@@ -38,6 +38,50 @@ namespace Flickoo.Api.Repositories
             return medias;
         }
 
+        public async Task<bool> IsMediaExistAsync(long productId, string url)
+        {
+            if (productId < 0 || string.IsNullOrEmpty(url))
+            {
+                _logger.LogWarning("Invalid product ID or URL provided.");
+                return false;
+            }
+            var mediaExist = await _dbContext.Medias
+                .AnyAsync(m => m.ProductId == productId && m.Url == url);
+            if (mediaExist)
+            {
+                _logger.LogInformation($"Media exists for product ID: {productId} and URL: {url}");
+            }
+            else
+            {
+                _logger.LogWarning($"No media found for product ID: {productId} and URL: {url}");
+            }
+            return mediaExist;
+        }
+
+        public string GetFileNameFromUrlAsync(string url)
+        {
+            if (string.IsNullOrEmpty(url))
+            {
+                _logger.LogWarning("Invalid URL provided.");
+                return string.Empty;
+            }
+            var splitedUrl = url.Split('/');
+            if (splitedUrl.Length == 0)
+            {
+                _logger.LogWarning($"Failed to split URL: {url}");
+                return string.Empty;
+            }
+            var fileName = $"{splitedUrl[splitedUrl.Length - 2]}/{splitedUrl[splitedUrl.Length - 1]}";
+
+            if (string.IsNullOrEmpty(fileName))
+            {
+                _logger.LogWarning($"Failed to extract file name from URL: {url}");
+                return string.Empty;
+            }
+            _logger.LogInformation($"Extracted file name: {fileName} from URL: {url}");
+            return fileName;
+        }
+
         public async Task<bool> AddMediaAsync(Media media)
         {
             if (media == null)
@@ -48,6 +92,13 @@ namespace Flickoo.Api.Repositories
 
             try
             {
+                var mediaExist = await _dbContext.Medias.AnyAsync(m => m.Url == media.Url);
+
+                if (mediaExist)
+                {
+                    _logger.LogInformation("AddMediaAsync: media is exist");
+                    return true;
+                }
                 await _dbContext.Medias.AddAsync(media);
                 await _dbContext.SaveChangesAsync();
                 _logger.LogInformation($"Media added for product ID: {media.ProductId}");

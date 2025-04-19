@@ -2,6 +2,7 @@
 using Flickoo.Api.DTOs.Media.Update;
 using Flickoo.Api.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
+using static Flickoo.Api.DTOs.Media.Create.CreateMediaRequest;
 
 namespace Flickoo.Api.Controllers
 {
@@ -35,20 +36,19 @@ namespace Flickoo.Api.Controllers
 
         //POST
         #region POST
-        /*[HttpPost]
-        public async Task<ActionResult<string>> AddMediaFile([FromBody] CreateMediaRequest request)
+        [HttpPost("{productId}")]
+        public async Task<ActionResult<string>> AddMediaFile(
+            [FromRoute] long productId,
+            [FromForm] MediaUploadRequest request)
         {
-            if (request == null)
-            {
-                return BadRequest("Request cannot be null");
-            }
+            if (request.File == null || string.IsNullOrEmpty(request.ContentType))
+                return BadRequest("File or content type is missing.");
 
-            if (request.File == null || request.ProductId < 0)
-            {
-                return BadRequest("File or Product ID is invalid");
-            }
-
-            var mediaUrl = await _mediaService.UploadMediaAsync(request.File.OpenReadStream(), request.File.FileName, request.ProductId);
+            var mediaUrl = await _mediaService.UploadMediaAsync(
+                request.File.OpenReadStream(),
+                request.FileName,
+                request.ContentType,
+                productId);
 
             if (mediaUrl == null)
             {
@@ -56,9 +56,8 @@ namespace Flickoo.Api.Controllers
             }
 
             return Ok("Media is added");
-
         }
-*/
+
         [HttpPost("{productId}/multiple")]
         public async Task<ActionResult<string>> AddMultipleMediaFiles(
             [FromRoute] long productId,
@@ -97,34 +96,25 @@ namespace Flickoo.Api.Controllers
         // PUT
         #region PUT
         [HttpPut("{productId}")]
-        public async Task<ActionResult<string>> UpdateProductMedias([FromRoute] long productId, [FromBody] IEnumerable<UpdateMediaRequest> requests)
+        public async Task<ActionResult<string>> UpdateProductMedia(
+            [FromRoute] long productId,
+            [FromForm] MediaUploadRequest request)
         {
-            if (productId < 0)
+            if (request.File == null || string.IsNullOrEmpty(request.ContentType))
+                return BadRequest("File or content type is missing.");
+
+            var mediaUrl = await _mediaService.UploadMediaAsync(
+                request.File.OpenReadStream(),
+                request.FileName,
+                request.ContentType,
+                productId);
+
+            if (mediaUrl == null)
             {
-                return BadRequest("Invalid product ID provided.");
+                return BadRequest("Failed to update media");
             }
 
-            foreach (var request in requests)
-            {
-                if (request == null)
-                {
-                    return BadRequest("Request cannot be null");
-                }
-                if (request == null)
-                {
-                    return BadRequest("Request cannot be null");
-                }
-                if (request.FileStream == null || productId < 0)
-                {
-                    return BadRequest("File or Product ID is invalid");
-                }
-                var isUpdatedUrl = await _mediaService.UploadMediaAsync(request.FileStream, request.FileName, request.FileName, productId);
-                if (isUpdatedUrl == null)
-                {
-                    return BadRequest("Failed to update media");
-                }
-            }
-                return Ok("All media is updated");
+            return Ok("Media is updated");
         }
         #endregion
 

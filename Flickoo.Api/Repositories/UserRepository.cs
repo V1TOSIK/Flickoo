@@ -23,19 +23,19 @@ namespace Flickoo.Api.Repositories
                 return null;
             }
 
-            var users = await _dbContext.Users
+            var user = await _dbContext.Users
                 .AsNoTracking()
                 .Include(u => u.Location)
                 .FirstOrDefaultAsync(u => u.Id == id);
 
-            if (users == null)
+            if (user == null)
             {
                 _logger.LogWarning($"GetUserByIdAsync: User with ID {id} not found.");
                 return null;
             }
             _logger.LogInformation($"GetUserByIdAsync: User with ID {id} retrieved successfully.");
 
-            return users;
+            return user;
         }
 
         public async Task<User?> AddUserAsync(User user)

@@ -101,23 +101,23 @@ namespace Flickoo.Api.Controllers
         }
 
         [HttpGet("category/{categoryId}")]
-        public async Task<ActionResult<ICollection<GetProductResponse>>> GetProductsByCategoryIdAsync([FromRoute] long categoryId)
+        public async Task<ActionResult<IEnumerable<GetProductResponse>>> GetProductsByCategoryIdAsync([FromRoute] long categoryId)
         {
             if (categoryId < 0)
                 return BadRequest();
-            var products = await _productService.GetProductsByCategoryIdAsync(categoryId);
+
+            IEnumerable<GetProductResponse> products;
+
+            if (categoryId == 0)
+                products = await _productService.GetAllProductsAsync();
+
+            else
+                products = await _productService.GetProductsByCategoryIdAsync(categoryId);
+
             if (products == null)
                 return NotFound();
-            var productResponse = products.Select(p => new GetProductResponse()
-            {
-                Id = p.Id,
-                Name = p.Name,
-                PriceAmount = p.PriceAmount,
-                PriceCurrency = p.PriceCurrency,
-                Description = p.Description,
-                MediaUrls = p.MediaUrls
-            }).ToList();
-            return Ok(productResponse);
+
+            return Ok(products);
         }
 
         #endregion
@@ -175,6 +175,8 @@ namespace Flickoo.Api.Controllers
                 return BadRequest("Error: Product is empty");
 
             var response = await _productService.UpdateProductAsync(productId, request);
+
+
 
             if (!response)
                 return NotFound("Product not found");

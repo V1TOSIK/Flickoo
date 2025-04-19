@@ -220,8 +220,8 @@ namespace Flickoo.Api.Services
             var product = new Product
             {
                 Name = request.Name,
-                Description = request.Description,
                 Price = new Price(request.PriceAmount, request.PriceCurrency) { },
+                Description = request.Description,
                 UserId = request.UserId,
                 LocationId = location.Id,
                 CategoryId = request.CategoryId,
@@ -259,10 +259,10 @@ namespace Flickoo.Api.Services
                 return false;
             }
             product.Name = request.Name ?? string.Empty;
-            product.Description = request.Description ?? string.Empty;
             product.Price = new Price(
                 request.PriceAmount,
                 request.PriceCurrency ?? string.Empty);
+            product.Description = request.Description ?? string.Empty;
             var updatedProduct = await _productRepository.UpdateProductAsync(product);
             if (!updatedProduct)
             {
@@ -280,19 +280,24 @@ namespace Flickoo.Api.Services
                 _logger.LogError("DeleteProduct: Invalid product ID provided.");
                 return false;
             }
+
+            var deleteMediaResult = await _mediaService.DeleteMediaAsync(productId);
+            
+            if (!deleteMediaResult)
+            {
+                _logger.LogError($"DeleteProduct: Failed to delete media for product ID {productId}.");
+                return false;
+            
+            }
+            _logger.LogInformation($"DeleteProduct: Product with ID {productId} deleted successfully.");
+            
             var deleteProductResult = await _productRepository.DeleteProductAsync(productId);
+            
             if (!deleteProductResult)
             {
                 _logger.LogError($"DeleteProduct: Failed to delete product with ID {productId}.");
                 return false;
             }
-            var deleteMediaResult = await _mediaService.DeleteMediaAsync(productId);
-            if (!deleteMediaResult)
-            {
-                _logger.LogError($"DeleteProduct: Failed to delete media for product ID {productId}.");
-                return false;
-            }
-            _logger.LogInformation($"DeleteProduct: Product with ID {productId} deleted successfully.");
             return true;
         }
     }

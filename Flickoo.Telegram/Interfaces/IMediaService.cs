@@ -6,9 +6,7 @@ namespace Flickoo.Telegram.Interfaces
 {
     public interface IMediaService
     {
-        string GetMediaTypeFromMsgAsync(ITelegramBotClient botClient,
-            Message msg,
-            long chatId,
+        string GetMediaTypeFromMsgAsync(Message msg,
             CancellationToken cancellationToken);
 
         Task<Stream> GetMediaFileFromMsgAsync(ITelegramBotClient botClient,
@@ -20,13 +18,8 @@ namespace Flickoo.Telegram.Interfaces
             long productId,
             CancellationToken cancellationToken);
 
-        Task<bool> UploadMediasAsync(ITelegramBotClient botClient,
-            IEnumerable<MediaRequest> mediaRequests,
-            long productId,
-            CancellationToken cancellationToken);
-
-        Task<bool> UpdateProductMediasAsync(ITelegramBotClient botClient,
-            IEnumerable<MediaRequest> mediaRequest,
+        Task<bool> UploadMediaAsync(ITelegramBotClient botClient,
+            MediaRequest mediaRequest,
             long productId,
             CancellationToken cancellationToken);
     }

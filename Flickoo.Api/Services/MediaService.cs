@@ -86,8 +86,6 @@ namespace Flickoo.Api.Services
 
             return mediaUrl;
         }
-
-
         public async Task<bool> DeleteMediaAsync(long productId)
         {
             if (productId < 0)
@@ -104,7 +102,9 @@ namespace Flickoo.Api.Services
                     _logger.LogWarning($"Invalid media URL found for product ID: {productId}");
                     continue;
                 }
-                var fileName = Path.GetFileName(url);
+
+                var fileName = _mediaRepository.GetFileNameFromUrlAsync(url);
+
                 if (string.IsNullOrEmpty(fileName))
                 {
                     _logger.LogWarning($"Invalid file name extracted from URL: {url}");
@@ -116,13 +116,13 @@ namespace Flickoo.Api.Services
                     _logger.LogError($"Failed to delete media from storage: {fileName}");
                     return false;
                 }
+            }
                 var dbResponse = await _mediaRepository.DeleteMediaAsync(productId);
                 if (!dbResponse)
                 {
                     _logger.LogError($"Failed to delete media from database for product ID: {productId}");
                     return false;
                 }
-            }
             return true;
         }
     }

@@ -87,26 +87,10 @@ namespace Flickoo.Api.Repositories
                 return false;
             }
 
-            var user = await _userRepository.GetUserByIdAsync(userId);
-            if (user == null)
-            {
-                _logger.LogWarning($"AddToFavouritesAsync: User with ID {userId} not found.");
-                return false;
-            }
-
-            var product = await _productRepository.GetProductByIdAsync(productId);
-            if (product == null)
-            {
-                _logger.LogWarning($"AddToFavouritesAsync: Product with ID {productId} not found.");
-                return false;
-            }
-
             var favourite = new Favourite
             {
                 UserId = userId,
-                User = user,
                 ProductId = productId,
-                Product = product
             };
 
             await _dbContext.Favourites.AddAsync(favourite);

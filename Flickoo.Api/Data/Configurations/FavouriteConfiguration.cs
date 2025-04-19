@@ -26,6 +26,10 @@ namespace Flickoo.Api.Data.Configurations
                 .WithMany(u => u.Favourites)
                 .HasForeignKey(l => l.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            builder
+               .HasIndex(f => new { f.UserId, f.ProductId })
+               .IsUnique();
         }
     }
 }

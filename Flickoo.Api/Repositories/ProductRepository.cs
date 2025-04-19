@@ -20,6 +20,9 @@ namespace Flickoo.Api.Repositories
         public async Task<IEnumerable<Product>> GetAllProductsAsync()
         {
             var products = await _dbContext.Products
+                .Include(p => p.Category)
+                .Include(p => p.User)
+                .Include(p => p.Location)
                 .AsNoTracking()
                 .ToListAsync();
             if (products == null || !products.Any())
@@ -41,6 +44,7 @@ namespace Flickoo.Api.Repositories
             var products = await _dbContext.Products
                 .Include(p => p.Category)
                 .Include(p => p.User)
+                .Include(p => p.Location)
                 .Include(p => p.ProductMedias)
                 .Where(p => p.UserId == userId)
                 .AsNoTracking()
@@ -64,7 +68,7 @@ namespace Flickoo.Api.Repositories
             var products = await _dbContext.Products
                 .Include(p => p.Category)
                 .Include(p => p.User)
-                .Include(p => p.ProductMedias)
+                .Include(p => p.Location)
                 .Where(p => p.CategoryId == categoryId)
                 .AsNoTracking()
                 .ToListAsync();
@@ -88,7 +92,7 @@ namespace Flickoo.Api.Repositories
             var product = await _dbContext.Products
                 .Include(p => p.Category)
                 .Include(p => p.User)
-                .Include(p => p.ProductMedias)
+                .Include(p => p.Location)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(p => p.Id == productId);
 
@@ -164,18 +168,18 @@ namespace Flickoo.Api.Repositories
                 return false;
             }
 
+            existingProduct.Name = string.IsNullOrEmpty(product.Name)
+                ? existingProduct.Name
+                : product.Name;
+
             var updatedPrice = new Price(
                 product.Price.Amount == 0 ? existingProduct.Price.Amount : product.Price.Amount,
                 string.IsNullOrEmpty(product.Price.Currency) ? existingProduct.Price.Currency : product.Price.Currency
             );
 
-            existingProduct.Name = string.IsNullOrEmpty(product.Name)
-                ? existingProduct.Name
-                : product.Name;
+            existingProduct.Price = updatedPrice;
 
-            product.Price = updatedPrice;
-
-            product.LocationId = product.LocationId == 0
+            existingProduct.LocationId = product.LocationId < 0
                 ? existingProduct.LocationId
                 : product.LocationId;
 

@@ -66,7 +66,7 @@ namespace Flickoo.Telegram.Services
                                     product.Id,
                                     $"📢 {product.Name}\n" +
                                     $"💰 {product.PriceAmount}  {product.PriceCurrency}\n" +
-                                    $"📍 Локація: {product.LocationName}\n" +
+                                    $"📍 {product.LocationName}\n" +
                                     $"──────────────────────────\n" +
                                     $"📜 Опис: {product.Description}",
                                     cancellationToken);
@@ -80,7 +80,7 @@ namespace Flickoo.Telegram.Services
                                     product.Id,
                                     $"📢 {product.Name}\n" +
                                     $"💰 {product.PriceAmount}  {product.PriceCurrency}\n" +
-                                    $"📍 Локація: {product.LocationName}\n" +
+                                    $"📍 {product.LocationName}\n" +
                                     $"──────────────────────────\n" +
                                     $"📜 Опис: {product.Description}",
                                     cancellationToken);
@@ -153,7 +153,7 @@ namespace Flickoo.Telegram.Services
                 CategoryId = session.CategoryId
             };
 
-            var response = await _httpClient.PostAsJsonAsync("https://localhost:8443/api/Product", product, cancellationToken);
+            var response = await _httpClient.PostAsJsonAsync($"https://localhost:8443/api/Product", product, cancellationToken);
             if (response.IsSuccessStatusCode)
             {
                 await _keyboards.SendMainKeyboard(botClient, chatId, "Продукт успішно додано", cancellationToken);
@@ -190,15 +190,19 @@ namespace Flickoo.Telegram.Services
                     mediaRequests.Add(mediaRequest);
                 }
 
-                var res = await _mediaService.UploadMediasAsync(botClient, mediaRequests, productIdParsed, cancellationToken);
-                if (res)
+                foreach (var mediaRequest in mediaRequests)
                 {
-                    _logger.LogInformation("Медіа успішно додано");
-                }
-                else
-                {
-                    _logger.LogError("Помилка при додаванні медіа");
-                    await _keyboards.SendMainKeyboard(botClient, chatId, "Помилка при додаванні медіа", cancellationToken);
+                    var res = await _mediaService.UploadMediaAsync(botClient, mediaRequest, productIdParsed, cancellationToken);
+
+                    if (res)
+                    {
+                        _logger.LogInformation("Медіа успішно додано");
+                    }
+                    else
+                    {
+                        _logger.LogError("Помилка при додаванні медіа");
+                        await _keyboards.SendMainKeyboard(botClient, chatId, "Помилка при додаванні медіа", cancellationToken);
+                    }
                 }
             }
 
@@ -234,6 +238,16 @@ namespace Flickoo.Telegram.Services
             {
                 await _keyboards.SendMainKeyboard(botClient, chatId, "Продукт успішно оновлено", cancellationToken);
                 _logger.LogInformation("Продукт успішно оновлено");
+                var mediaResponse = await _httpClient.DeleteAsync($"https://localhost:8443/api/Media/{session.ProductId}", cancellationToken);
+                if (mediaResponse.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation("Медіа успішно видалено");
+                }
+                else
+                {
+                    _logger.LogError("Помилка при видалені медіа для оновлення");
+                    await _keyboards.SendMainKeyboard(botClient, chatId, "Помилка при оновлені медіа", cancellationToken);
+                }
             }
             else
             {
@@ -247,16 +261,33 @@ namespace Flickoo.Telegram.Services
                 for (int i = 0; i < session.MediaFiles.Count; i++)
                 {
                     var mediaFile = session.MediaFiles[i];
+                    if (mediaFile.CanSeek)
+                        mediaFile.Position = 0;
+
                     var mediaRequest = new MediaRequest
                     {
                         ProductId = session.ProductId,
                         FileName = $"{chatId}_{session.ProductId}_{i + 1}.{session.MediaTypes[i]}",
+                        ContentType = session.MediaTypes[i],
                         FileStream = mediaFile
                     };
                     mediaRequests.Add(mediaRequest);
                 }
-                
-                await _mediaService.UpdateProductMediasAsync(botClient, mediaRequests, product.Id, cancellationToken);
+
+                foreach (var mediaRequest in mediaRequests)
+                {
+                    var res = await _mediaService.UploadMediaAsync(botClient, mediaRequest, session.ProductId, cancellationToken);
+
+                    if (res)
+                    {
+                        _logger.LogInformation("Медіа успішно оновлено");
+                    }
+                    else
+                    {
+                        _logger.LogError("Помилка при оновлені медіа");
+                        await _keyboards.SendMainKeyboard(botClient, chatId, "Помилка при оновлені медіа", cancellationToken);
+                    }
+                }
             }
 
             return ProductSessionState.Idle;
@@ -286,15 +317,6 @@ namespace Flickoo.Telegram.Services
                 _logger.LogError("Помилка при видаленні продукту");
             }
 
-            var responseMedias = await _httpClient.DeleteAsync($"https://localhost:8443/api/Media/{productId}", cancellationToken);
-            if (responseMedias.IsSuccessStatusCode)
-            {
-                _logger.LogInformation("Медіа успішно видалено");
-            }
-            else
-            {
-                _logger.LogError("Помилка при видаленні медіа");
-            }
         }
 
         public async Task WriteToSeller(ITelegramBotClient botClient,

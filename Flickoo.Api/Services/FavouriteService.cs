@@ -7,11 +7,14 @@ namespace Flickoo.Api.Services
     public class FavouriteService : IFavouriteService
     {
         private readonly IFavouriteRepository _favouriteRepository;
+        private readonly ILocationRepository _locationRepository;
         private readonly ILogger<FavouriteService> _logger;
         public FavouriteService(IFavouriteRepository favouriteRepository,
+            ILocationRepository locationRepository,
             ILogger<FavouriteService> logger)
         {
             _favouriteRepository = favouriteRepository;
+            _locationRepository = locationRepository;
             _logger = logger;
         }
 
@@ -45,7 +48,8 @@ namespace Flickoo.Api.Services
             }
             
             var products = await _favouriteRepository.GetFavouriteProductsAsync(userId);
-           
+
+
             if (products == null || !products.Any())
             {
                 _logger.LogWarning($"GetFavouriteProductsAsync: No favourite products found for user {userId}.");
@@ -58,7 +62,7 @@ namespace Flickoo.Api.Services
                 Name = p.Name,
                 PriceAmount = p.Price.Amount,
                 PriceCurrency = p.Price.Currency,
-                LocationName = p.Location.Name,
+                LocationName = _locationRepository.GetLocationByIdAsync(p.LocationId).Result.Name,
                 Description = p.Description,
                 MediaUrls = p.ProductMedias?
                     .Select(pm => pm?.Url)

@@ -20,12 +20,12 @@ namespace Flickoo.Api.Controllers
         // GET
         #region GET
         [HttpGet]
-        public async Task<IEnumerable<GetProductResponse>> GetFavouritesProduct([FromRoute] long userId)
+        public async Task<ActionResult<IEnumerable<GetProductResponse>>> GetFavouritesProduct([FromRoute] long userId)
         {
             if (userId < 0)
             {
                 _logger.LogError("GetFavouritesProduct: Invalid user ID provided.");
-                return Enumerable.Empty<GetProductResponse>();
+                return BadRequest(Enumerable.Empty<GetProductResponse>());
             }
 
             var products = await _favouriteService.GetFavouriteProductsAsync(userId);
@@ -33,19 +33,19 @@ namespace Flickoo.Api.Controllers
             if (products == null || !products.Any())
             {
                 _logger.LogWarning($"GetFavouritesProduct: No favourite products found for user {userId}.");
-                return Enumerable.Empty<GetProductResponse>();
+                return Ok(products);
             }
 
             _logger.LogInformation($"GetFavouritesProduct: Favourite products retrieved for user {userId}.");
             
-            return products;
+            return Ok(products);
         }
         #endregion
 
         // POST
         #region POST
         [HttpPost("{productId}")]
-        public async Task<ActionResult<string>> AddToFavourite([FromRoute] long productId, [FromRoute] long userId)
+        public async Task<ActionResult<string>> AddToFavourite([FromRoute] long userId, [FromRoute] long productId)
         {
             if (productId < 0 || userId < 0)
             {
@@ -53,7 +53,7 @@ namespace Flickoo.Api.Controllers
                 return BadRequest("Invalid product ID or user ID");
             }
 
-            var result = await _favouriteService.AddFavouritesAsync(productId, userId);
+            var result = await _favouriteService.AddFavouritesAsync(userId, productId);
             if (result)
             {
                 _logger.LogInformation($"Product {productId} added to user {userId}'s favourites.");
@@ -70,7 +70,7 @@ namespace Flickoo.Api.Controllers
         // DELETE
         #region DELETE
         [HttpDelete("{productId}")]
-        public async Task<ActionResult<string>> RemoveFromFavourite([FromRoute] long productId, [FromRoute] long userId)
+        public async Task<ActionResult<string>> RemoveFromFavourite([FromRoute] long userId, [FromRoute] long productId)
         {
             if (productId < 0 || userId < 0)
             {
@@ -78,7 +78,7 @@ namespace Flickoo.Api.Controllers
                 return BadRequest("Invalid product ID or user ID");
             }
 
-            var result = await _favouriteService.RemoveFavouritesAsync(productId, userId);
+            var result = await _favouriteService.RemoveFavouritesAsync(userId, productId);
 
             if (result)
             {
