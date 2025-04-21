@@ -1,5 +1,6 @@
 ﻿using Flickoo.Telegram.DTOs.Media;
 using Flickoo.Telegram.Interfaces;
+using Microsoft.Extensions.Options;
 using System.Net.Http.Json;
 using Telegram.Bot;
 using Telegram.Bot.Types;
@@ -12,12 +13,15 @@ namespace Flickoo.Telegram.Services
     {
         private readonly HttpClient _httpClient;
         private readonly ILogger<MediaService> _logger;
+        private readonly string _apiUrl;
 
         public MediaService(HttpClient httpClient,
-            ILogger<MediaService> logger)
+            ILogger<MediaService> logger,
+            IOptions<ApiOptions> apiOptions)
         {
             _httpClient = httpClient;
             _logger = logger;
+            _apiUrl = apiOptions.Value.Url;
         }
 
         public string GetMediaTypeFromMsgAsync(Message msg,
@@ -90,7 +94,7 @@ namespace Flickoo.Telegram.Services
             content.Add(new StringContent(mediaRequest.FileName), "fileName");
             content.Add(new StringContent(mediaRequest.ContentType), "contentType");
 
-            var response = await _httpClient.PostAsync($"https://localhost:8443/api/Media/{productId}", content, cancellationToken);
+            var response = await _httpClient.PostAsync($"{_apiUrl}/api/Media/{productId}", content, cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
@@ -115,7 +119,7 @@ namespace Flickoo.Telegram.Services
                 _logger.LogWarning("Invalid product ID provided.");
                 throw new ArgumentOutOfRangeException(nameof(productId));
             }
-            var mediaUrls = await _httpClient.GetFromJsonAsync<List<string>>($"https://localhost:8443/api/Media/{productId}", cancellationToken);
+            var mediaUrls = await _httpClient.GetFromJsonAsync<List<string>>($"{_apiUrl}/api/Media/{productId}", cancellationToken);
 
             if (mediaUrls == null || !mediaUrls.Any())
             {

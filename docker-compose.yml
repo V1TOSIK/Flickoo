@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  postgres:
+    container_name: postgres
+    image: postgres:17
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - flickoo-network
+  
+  minio:
+    container_name: minio
+    image: minio/minio
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server --console-address ":9001" /data
+    volumes:
+      - minio_data:/data
+    networks:
+      - flickoo-network
+
+  api:
+    container_name: api
+    build:
+      context: .
+      dockerfile: Flickoo.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};Database=${POSTGRES_DB}
+      Minio__Endpoint: minio:9000
+      Minio__AccessKey: ${MINIO_ROOT_USER}
+      Minio__SecretKey: ${MINIO_ROOT_PASSWORD}
+    depends_on:
+      - postgres
+      - minio
+    ports:
+      - "8443:8443"
+    networks:
+      - flickoo-network
+
+  telegram:
+    container_name: bot
+    build:
+      context: .
+      dockerfile: Flickoo.Telegram/Dockerfile
+    environment:
+      Telegram__Token: ${Telegram__Token}
+    depends_on:
+      - api
+    ports:
+      - "5000:5000"
+    networks:
+      - flickoo-network
+
+volumes:
+  pgdata:
+  minio_data:
+
+networks:
+  flickoo-network:
+    driver: bridge
