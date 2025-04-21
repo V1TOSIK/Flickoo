@@ -9,6 +9,7 @@ IHost host = Host.CreateDefaultBuilder(args)
     .ConfigureServices((context, services) =>
     {
         services.Configure<TelegramOptions>(context.Configuration.GetSection(nameof(Telegram)));
+        services.Configure<ApiOptions>(context.Configuration.GetSection(ApiOptions.Api));
 
         services.AddHttpClient("TelegramBotClient").RemoveAllLoggers()
             .AddTypedClient<ITelegramBotClient>((httpClient, sp) =>
@@ -19,6 +20,8 @@ IHost host = Host.CreateDefaultBuilder(args)
                 return new TelegramBotClient(options, httpClient);
             });
         services.AddHostedService<TelegramBotService>();
+
+
 
         services.AddSingleton<IUserService, UserService>();
         services.AddSingleton<IProductService, ProductService>();

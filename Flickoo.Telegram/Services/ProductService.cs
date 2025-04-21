@@ -8,6 +8,7 @@ using Flickoo.Telegram.SessionModels;
 using Flickoo.Telegram.DTOs.Product;
 using Flickoo.Telegram.DTOs.Media;
 using Flickoo.Telegram.DTOs.User;
+using Microsoft.Extensions.Options;
 
 namespace Flickoo.Telegram.Services
 {
@@ -17,17 +18,20 @@ namespace Flickoo.Telegram.Services
         private readonly ILogger<ProductService> _logger;
         private readonly IMediaService _mediaService;
         private readonly IKeyboards _keyboards;
+        private readonly string _apiUrl;
 
         public ProductService(
             IMediaService mediaService,
             HttpClient httpClient,
             ILogger<ProductService> logger,
-            IKeyboards keyboards)
+            IKeyboards keyboards,
+            IOptions<ApiOptions> apiOptions)
         {
             _mediaService = mediaService;
             _httpClient = httpClient;
             _logger = logger;
             _keyboards = keyboards;
+            _apiUrl = apiOptions.Value.Url;
         }
 
         public async Task GetUserProducts(ITelegramBotClient botClient,
@@ -40,7 +44,7 @@ namespace Flickoo.Telegram.Services
                 throw new ArgumentNullException(nameof(chatId));
             }
 
-            var productResponse = await _httpClient.GetAsync($"https://localhost:8443/api/Product/myproducts/{chatId}", cancellationToken);
+            var productResponse = await _httpClient.GetAsync($"{_apiUrl}/api/Product/myproducts/{chatId}", cancellationToken);
 
             if (productResponse.IsSuccessStatusCode)
             {
@@ -111,7 +115,7 @@ namespace Flickoo.Telegram.Services
             CancellationToken cancellationToken)
         {
 
-            var response = await _httpClient.GetAsync($"https://localhost:8443/api/Product/category/{categoryId}", cancellationToken);
+            var response = await _httpClient.GetAsync($"{_apiUrl}/api/Product/category/{categoryId}", cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
@@ -153,7 +157,7 @@ namespace Flickoo.Telegram.Services
                 CategoryId = session.CategoryId
             };
 
-            var response = await _httpClient.PostAsJsonAsync($"https://localhost:8443/api/Product", product, cancellationToken);
+            var response = await _httpClient.PostAsJsonAsync($"{_apiUrl}/api/Product", product, cancellationToken);
             if (response.IsSuccessStatusCode)
             {
                 await _keyboards.SendMainKeyboard(botClient, chatId, "Продукт успішно додано", cancellationToken);
@@ -233,12 +237,12 @@ namespace Flickoo.Telegram.Services
                 UserId = chatId
             };
 
-            var response = await _httpClient.PutAsJsonAsync($"https://localhost:8443/api/Product/{session.ProductId}", product, cancellationToken);
+            var response = await _httpClient.PutAsJsonAsync($"{_apiUrl}/api/Product/{session.ProductId}", product, cancellationToken);
             if (response.IsSuccessStatusCode)
             {
                 await _keyboards.SendMainKeyboard(botClient, chatId, "Продукт успішно оновлено", cancellationToken);
                 _logger.LogInformation("Продукт успішно оновлено");
-                var mediaResponse = await _httpClient.DeleteAsync($"https://localhost:8443/api/Media/{session.ProductId}", cancellationToken);
+                var mediaResponse = await _httpClient.DeleteAsync($"{_apiUrl}/api/Media/{session.ProductId}", cancellationToken);
                 if (mediaResponse.IsSuccessStatusCode)
                 {
                     _logger.LogInformation("Медіа успішно видалено");
@@ -304,7 +308,7 @@ namespace Flickoo.Telegram.Services
                 await botClient.SendMessage(chatId, "Виберіть продукт для видалення", cancellationToken: cancellationToken);
                 return;
             }
-            var response = await _httpClient.DeleteAsync($"https://localhost:8443/api/Product/{productId}", cancellationToken);
+            var response = await _httpClient.DeleteAsync($"{_apiUrl}/api/Product/{productId}", cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
@@ -325,7 +329,7 @@ namespace Flickoo.Telegram.Services
             string userName,
             CancellationToken cancellationToken)
         {
-            var response = await _httpClient.GetFromJsonAsync<GetSellerResponse>($"https://localhost:8443/api/Product/{productId}/seller", cancellationToken);
+            var response = await _httpClient.GetFromJsonAsync<GetSellerResponse>($"{_apiUrl}/api/Product/{productId}/seller", cancellationToken);
 
             if (response != null)
             {

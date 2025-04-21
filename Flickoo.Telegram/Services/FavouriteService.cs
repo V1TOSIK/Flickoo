@@ -1,5 +1,6 @@
 ﻿using Flickoo.Telegram.DTOs.Product;
 using Flickoo.Telegram.Interfaces;
+using Microsoft.Extensions.Options;
 using System.Net.Http.Json;
 using Telegram.Bot;
 
@@ -9,11 +10,14 @@ namespace Flickoo.Telegram.Services
     {
         private readonly HttpClient _httpClient;
         private readonly ILogger<FavouriteService> _logger;
+        private readonly string _apiUrl;
         public FavouriteService(HttpClient httpClient,
-            ILogger<FavouriteService> logger)
+            ILogger<FavouriteService> logger,
+            IOptions<ApiOptions> apiOptions)
         {
             _httpClient = httpClient;
             _logger = logger;
+            _apiUrl = apiOptions.Value.Url;
         }
 
         public async Task AddToFavouriteProduct(ITelegramBotClient botClient,
@@ -27,7 +31,7 @@ namespace Flickoo.Telegram.Services
                 await botClient.SendMessage(chatId, "Виберіть продукт для лайку", cancellationToken: cancellationToken);
                 return;
             }
-            var response = await _httpClient.PostAsync($"https://localhost:8443/api/user/{chatId}/favourites/{productId}",null, cancellationToken);
+            var response = await _httpClient.PostAsync($"{_apiUrl}/api/user/{chatId}/favourites/{productId}",null, cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
@@ -54,7 +58,7 @@ namespace Flickoo.Telegram.Services
             if (productId == 0)
                 return;
 
-            var response = await _httpClient.DeleteAsync($"https://localhost:8443/api/user/{chatId}/favourites/{productId}", cancellationToken);
+            var response = await _httpClient.DeleteAsync($"{_apiUrl}/api/user/{chatId}/favourites/{productId}", cancellationToken);
             if (response.IsSuccessStatusCode)
                 _logger.LogInformation($"product is disliked");
 
@@ -69,7 +73,7 @@ namespace Flickoo.Telegram.Services
             string filter,
             CancellationToken cancellationToken)
         {
-            var response = await _httpClient.GetAsync($"https://localhost:8443/api/user/{chatId}/favourites", cancellationToken);
+            var response = await _httpClient.GetAsync($"{_apiUrl}/api/user/{chatId}/favourites", cancellationToken);
             if (response.IsSuccessStatusCode)
             {
                 var products = await response.Content.ReadFromJsonAsync<Queue<GetProductResponse>>(cancellationToken: cancellationToken);

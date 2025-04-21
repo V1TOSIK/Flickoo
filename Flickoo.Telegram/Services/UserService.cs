@@ -4,8 +4,7 @@ using Flickoo.Telegram.enums;
 using Telegram.Bot;
 using Flickoo.Telegram.SessionModels;
 using Flickoo.Telegram.DTOs.User;
-using System.Threading;
-using Telegram.Bot.Types;
+using Microsoft.Extensions.Options;
 
 namespace Flickoo.Telegram.Services
 {
@@ -14,14 +13,17 @@ namespace Flickoo.Telegram.Services
         private readonly HttpClient _httpClient;
         private readonly ILogger<TelegramBotService> _logger;
         private readonly IKeyboards _keyboards;
+        private readonly string _apiUrl;
         public UserService(
             HttpClient httpClient,
             ILogger<TelegramBotService> logger,
-            IKeyboards keyboards)
+            IKeyboards keyboards,
+            IOptions<ApiOptions> apiOptions)
         {
             _httpClient = httpClient;
             _logger = logger;
             _keyboards = keyboards;
+            _apiUrl = apiOptions.Value.Url;
         }
 
         public async Task MyProfile(ITelegramBotClient botClient, long chatId, CancellationToken cancellationToken)
@@ -32,7 +34,7 @@ namespace Flickoo.Telegram.Services
                 return;
             }
 
-            var response = await _httpClient.GetFromJsonAsync<GetUserResponse>($"https://localhost:8443/api/User/{chatId}", cancellationToken);
+            var response = await _httpClient.GetFromJsonAsync<GetUserResponse>($"{_apiUrl}/api/User/{chatId}", cancellationToken);
 
             if (response != null)
             {
@@ -101,7 +103,7 @@ namespace Flickoo.Telegram.Services
                 };
             }
 
-            var response = await _httpClient.PostAsJsonAsync("https://localhost:8443/api/User", createUserRequest, cancellationToken: cancellationToken);
+            var response = await _httpClient.PostAsJsonAsync($"{_apiUrl}/api/User", createUserRequest, cancellationToken: cancellationToken);
             if (response.IsSuccessStatusCode)
             {
                 _logger.LogInformation($"Added unregistered user with Id:{chatId} | UserName: {username} | Location: {null}");
@@ -134,7 +136,7 @@ namespace Flickoo.Telegram.Services
                 Registered = true
             };
 
-            var response = await _httpClient.PostAsJsonAsync("https://localhost:8443/api/User/registration", user, cancellationToken: cancellationToken);
+            var response = await _httpClient.PostAsJsonAsync($"{_apiUrl}/api/User/registration", user, cancellationToken: cancellationToken);
             if (response.IsSuccessStatusCode)
             {
                 _logger.LogInformation($"Added user with Id:{chatId} | UserName: {session.UserName} | Location: {session.LocationName}");
@@ -166,7 +168,7 @@ namespace Flickoo.Telegram.Services
                 LocationName = session.LocationName
             };
 
-            var response = await _httpClient.PutAsJsonAsync($"https://localhost:8443/api/User/{chatId}", newUser, cancellationToken: cancellationToken);
+            var response = await _httpClient.PutAsJsonAsync($"{_apiUrl}/api/User/{chatId}", newUser, cancellationToken: cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
