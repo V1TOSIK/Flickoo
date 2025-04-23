@@ -20,12 +20,12 @@ namespace Flickoo.Telegram.Services
             _logger = logger;
             _keyboards = keyboards;
         }
-        public async Task<bool> UserSessionCheck(ITelegramBotClient botClient, long chatId, Message msg, CancellationToken cancellationToken)
+        public async Task<bool> UserSessionCheck(ITelegramBotClient botClient, long chatId, string userName, Message msg, CancellationToken cancellationToken)
         {
             var session = GetUserSession(chatId);
 
             if (string.IsNullOrEmpty(session.Action))
-                return await HandleUserCommand(botClient, msg, chatId, cancellationToken);
+                return await HandleUserCommand(botClient, msg, userName, chatId, cancellationToken);
 
             if (session.Action == "Create")
                 return await RegisterUser(botClient, msg, chatId, cancellationToken);
@@ -39,6 +39,7 @@ namespace Flickoo.Telegram.Services
 
         public async Task<bool> HandleUserCommand(ITelegramBotClient botClient,
             Message command,
+            string userName,
             long chatId,
             CancellationToken cancellationToken)
         {
@@ -53,7 +54,7 @@ namespace Flickoo.Telegram.Services
             switch (command.Text.ToLower())
             {
                 case "👤":
-                    await _userService.MyProfile(botClient, chatId, cancellationToken);
+                    await _userService.MyProfile(botClient, chatId, userName, cancellationToken);
                     return true;
 
                 case "створити акаунт":

@@ -33,7 +33,7 @@ namespace Flickoo.Api.Controllers
             if (response == null)
             {
                 _logger.LogWarning($"GetUserByIdAsync: User with ID {userId} not found.");
-                return NotFound("User not found");
+                return NotFound(null);
             }
             
             _logger.LogInformation($"GetUserByIdAsync: User with ID {userId} retrieved successfully.");

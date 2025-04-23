@@ -26,7 +26,7 @@ namespace Flickoo.Telegram.Services
             _apiUrl = apiOptions.Value.Url;
         }
 
-        public async Task MyProfile(ITelegramBotClient botClient, long chatId, CancellationToken cancellationToken)
+        public async Task MyProfile(ITelegramBotClient botClient, long chatId, string userName, CancellationToken cancellationToken)
         {
             if (chatId == 0)
             {
@@ -34,18 +34,28 @@ namespace Flickoo.Telegram.Services
                 return;
             }
 
-            var response = await _httpClient.GetFromJsonAsync<GetUserResponse>($"{_apiUrl}/api/User/{chatId}", cancellationToken);
+            var response = await _httpClient.GetAsync($"{_apiUrl}/api/User/{chatId}", cancellationToken);
 
-            if (response != null)
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                if (response.Registered)
+                _logger.LogWarning($"Користувача з ID {chatId} не знайдено.");
+                await _keyboards.SendMainKeyboard(botClient, chatId, "Користувача не знайдено.", cancellationToken);
+                await AddUnRegisteredUser(botClient, chatId, userName, cancellationToken);
+                return;
+            }
+
+            var userResponse = await response.Content.ReadFromJsonAsync<GetUserResponse>(cancellationToken: cancellationToken);
+
+            if (userResponse != null)
+            {
+                if (userResponse.Registered)
                 {
                 _logger.LogInformation("Користувача знайдено!");
                 await _keyboards.SendMyProfileKeyboard(botClient,
                     chatId,
-                    response,
-                    $"NickName: {response.Nickname}\n"
-                    + $"Location: {response.LocationName}",
+                    userResponse,
+                    $"NickName: {userResponse.Nickname}\n"
+                    + $"Location: {userResponse.LocationName}",
                     cancellationToken);
                 }
                 else
@@ -86,9 +96,9 @@ namespace Flickoo.Telegram.Services
                 createUserRequest = new CreateUserRequest
                 {
                     Id = chatId,
-                    Username = "",
-                    NickName = "",
-                    LocationName = "",
+                    Username = username,
+                    NickName = string.Empty,
+                    LocationName = "none",
                     Registered = false
                 };
             }
@@ -98,7 +108,7 @@ namespace Flickoo.Telegram.Services
                 {
                     Id = chatId,
                     Username = username,
-                    LocationName = "",
+                    LocationName = "none",
                     Registered = false
                 };
             }
