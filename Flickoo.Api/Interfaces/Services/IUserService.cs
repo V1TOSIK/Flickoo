@@ -11,5 +11,6 @@ namespace Flickoo.Api.Interfaces.Services
         Task<bool> RegisterUserAsync(CreateUserRequest request);
         Task<bool> UpdateUserAsync(long userId, UpdateUserRequest request);
         Task<bool> DeleteUserAsync(long userId);
+        Task<bool> CheckUserRegistrationAsync(long userId);
     }
 }

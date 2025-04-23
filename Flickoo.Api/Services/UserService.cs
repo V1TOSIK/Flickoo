@@ -219,5 +219,15 @@ namespace Flickoo.Api.Services
             }
             return await _userRepository.DeleteUserAsync(userId);
         }
+
+        public async Task<bool> CheckUserRegistrationAsync(long userId)
+        {
+            if (userId < 0)
+            {
+                _logger.LogError("CheckUserRegistration: Invalid user ID provided.");
+                return false;
+            }
+            return await _userRepository.CheckUserRegistrationAsync(userId);
+        }
     }
 }

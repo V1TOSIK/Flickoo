@@ -340,19 +340,6 @@ namespace Flickoo.Telegram.Services
                             cancellationToken: cancellationToken);
                         return;
                     }
-                    /*Chat sellerChat;
-                    try
-                    {
-                        sellerChat = await botClient.GetChat(response.Id, cancellationToken);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError($"Не вдалося отримати дані про продавця із id {response.Id}: {ex.Message}");
-                        await botClient.SendMessage(chatId,
-                            "Не вдалося отримати дані про продавця.",
-                            cancellationToken: cancellationToken);
-                        return;
-                    }*/
 
                     if (string.IsNullOrEmpty(response.Username))
                     {

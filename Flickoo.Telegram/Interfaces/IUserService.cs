@@ -8,6 +8,7 @@ namespace Flickoo.Telegram.Interfaces
     {
         Task MyProfile(ITelegramBotClient botClient,
             long chatId,
+            string userName,
             CancellationToken cancellationToken);
 
         Task<UserSessionState> CreateAccount(ITelegramBotClient botClient,

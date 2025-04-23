@@ -80,10 +80,10 @@ namespace Flickoo.Telegram
                 return;
             }
 
-            if (await HandleBaseCommand(botClient, chatId, msg, cancellationToken))
+            if (await HandleBaseCommand(botClient, chatId, userName, msg, cancellationToken))
                 return;
 
-            if (await _userSessionService.UserSessionCheck(botClient, chatId, msg, cancellationToken))
+            if (await _userSessionService.UserSessionCheck(botClient, chatId, userName, msg, cancellationToken))
                 return;
             
             if (await _productSessionService.ProductSessionCheck(botClient, chatId, msg, cancellationToken))
@@ -98,6 +98,7 @@ namespace Flickoo.Telegram
 
         private async Task<bool> HandleBaseCommand(ITelegramBotClient botClient,
             long chatId,
+            string userName,
             Message command,
             CancellationToken cancellationToken)
         {
@@ -119,7 +120,7 @@ namespace Flickoo.Telegram
                     await _keyboards.SendMainKeyboard(botClient, chatId, "Привіт 👋😊\n" +
                         "Якщо потрібна допомога, то в меню є команда - > /help\n" +
                         "Приємного користування 👋", cancellationToken);
-                    await _userService.AddUnRegisteredUser(botClient, chatId, command.From.Username ?? "Unknown", cancellationToken);
+                    await _userService.AddUnRegisteredUser(botClient, chatId, userName, cancellationToken);
                     return true;
 
                 case "/help":
@@ -128,7 +129,7 @@ namespace Flickoo.Telegram
                         "Думаю у вас не буде проблем з ботом", cancellationToken);
                     return true;
 
-                    case "/language":
+                case "/language":
                     await _keyboards.SendMainKeyboard(botClient, chatId, "Додаток підтримує лише українську мову", cancellationToken);
                     return true;
 

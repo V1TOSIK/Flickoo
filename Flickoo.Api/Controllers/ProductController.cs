@@ -14,12 +14,15 @@ namespace Flickoo.Api.Controllers
     public class ProductController : ControllerBase
     {
         private readonly IProductService _productService;
+        private readonly IUserService _userService;
         private readonly ILogger<ProductController> _logger;
 
         public ProductController(IProductService productService,
+            IUserService userService,
             ILogger<ProductController> logger)
         {
             _productService = productService;
+            _userService = userService;
             _logger = logger;
 
         }
@@ -75,6 +78,14 @@ namespace Flickoo.Api.Controllers
         {
             if (userId == 0)
                 return BadRequest();
+
+            var userRegistered = await _userService.CheckUserRegistrationAsync(userId);
+
+            if (!userRegistered)
+            {
+                _logger.LogError("User not registered");
+                return NotFound();
+            }
 
             var products = await _productService.GetProductsByUserIdAsync(userId);
 

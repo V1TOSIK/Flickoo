@@ -8,11 +8,13 @@ namespace Flickoo.Telegram.Interfaces
     {
         Task<bool> UserSessionCheck(ITelegramBotClient botClient,
             long chatId,
+            string userName,
             Message msg,
             CancellationToken cancellationToken);
 
         Task<bool> HandleUserCommand(ITelegramBotClient botClient,
             Message command,
+            string userName,
             long chatId,
             CancellationToken cancellationToken);
 
