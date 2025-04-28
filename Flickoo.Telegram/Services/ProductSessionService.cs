@@ -6,6 +6,9 @@ using Telegram.Bot.Types;
 using Telegram.Bot;
 using Telegram.Bot.Types.ReplyMarkups;
 
+using TParseMode = Telegram.Bot.Types.Enums.ParseMode;
+using System;
+
 namespace Flickoo.Telegram.Services
 {
     class ProductSessionService : IProductSessionService
@@ -296,36 +299,39 @@ namespace Flickoo.Telegram.Services
             });
             var mediaList = await _mediaService.GetMediaFromUrlsByProductIdAsync(botClient, product.Id, cancellationToken);
 
-
-
-            string productText = $"📢 {product.Name}\n" +
-                         $"💰 {product.PriceAmount} {product.PriceCurrency}\n" +
-                         $"📍 {product.LocationName}\n" +
-                         $"──────────────────────────\n" +
-                         $"📜 Опис: {product.Description}";
-
-            if (mediaList != null && mediaList.Count > 0)
+            var caption =
+                $"📢 {product.Name}\n" +
+                $"💰 {product.PriceAmount} {product.PriceCurrency}\n" +
+                $"📍 {product.LocationName}\n" +
+                $"📜 Опис: {product.Description}";
+            if (mediaList == null || mediaList.Count == 0)
             {
-                await botClient.SendMediaGroup(
-                    chatId: chatId,
-                    mediaList,
-                    cancellationToken: cancellationToken
-                );
-                
-
-                await botClient.SendMessage(chatId,
-                    productText,
-                    cancellationToken: cancellationToken,
-                    replyMarkup: inlineKeyboard);
-                return;
+                await botClient.SendMessage(chatId, caption, replyMarkup: inlineKeyboard, cancellationToken: cancellationToken);
             }
             else
             {
-                await botClient.SendMessage(chatId,
-                    productText,
-                    cancellationToken: cancellationToken,
-                    replyMarkup: inlineKeyboard);
-                return;
+
+                if (mediaList.Count > 0)
+                {
+                    if (mediaList[0] is InputMediaPhoto inputMediaPhoto)
+                    {
+                        inputMediaPhoto.Caption = caption;
+                        inputMediaPhoto.ParseMode = TParseMode.Markdown;
+                    }
+                    else if (mediaList[0] is InputMediaVideo inputMediaVideo)
+                    {
+                        inputMediaVideo.Caption = caption;
+                        inputMediaVideo.ParseMode = TParseMode.Markdown;
+                    }
+                    await botClient.SendMediaGroup(chatId, mediaList, cancellationToken: cancellationToken);
+                    await botClient.SendMessage(
+                    chatId: chatId,
+                    text: "Що хочете зробити з оголошенням?  📦",
+                    replyMarkup: inlineKeyboard,
+                    cancellationToken: cancellationToken
+                );
+                }
+
             }
         }
 
@@ -349,33 +355,38 @@ namespace Flickoo.Telegram.Services
 
             var mediaList = await _mediaService.GetMediaFromUrlsByProductIdAsync(botClient, product.Id, cancellationToken);
 
-            string productText = $"📢 {product.Name}\n" +
-                         $"💰 {product.PriceAmount} {product.PriceCurrency}\n" +
-                         $"📍 {product.LocationName}\n" +
-                         $"──────────────────────────\n" +
-                         $"📜 Опис: {product.Description}";
-
-            if (mediaList.Count > 0)
+            var caption =
+                $"📢 {product.Name}\n" +
+                $"💰 {product.PriceAmount} {product.PriceCurrency}\n" +
+                $"📍 {product.LocationName}\n" +
+                $"📜 Опис: {product.Description}";
+            if (mediaList == null || mediaList.Count == 0)
             {
-                await botClient.SendMediaGroup(
-                    chatId: chatId,
-                    mediaList,
-                    cancellationToken: cancellationToken
-                );
-
-                await botClient.SendMessage(chatId,
-                    productText,
-                    cancellationToken: cancellationToken,
-                    replyMarkup: inlineKeyboard);
-                return;
+                await botClient.SendMessage(chatId, caption, replyMarkup: inlineKeyboard, cancellationToken: cancellationToken);
             }
             else
             {
-                await botClient.SendMessage(chatId,
-                    productText,
-                    cancellationToken: cancellationToken,
-                    replyMarkup: inlineKeyboard);
-                return;
+
+                if (mediaList.Count > 0)
+                {
+                    if (mediaList[0] is InputMediaPhoto inputMediaPhoto)
+                    {
+                        inputMediaPhoto.Caption = caption;
+                        inputMediaPhoto.ParseMode = TParseMode.Markdown;
+                    }
+                    else if (mediaList[0] is InputMediaVideo inputMediaVideo)
+                    {
+                        inputMediaVideo.Caption = caption;
+                        inputMediaVideo.ParseMode = TParseMode.Markdown;
+                    }
+                    await botClient.SendMediaGroup(chatId, mediaList, cancellationToken: cancellationToken);
+                    await botClient.SendMessage(
+                    chatId: chatId,
+                    text: "Що хочете зробити з оголошенням?  📦",
+                    replyMarkup: inlineKeyboard,
+                    cancellationToken: cancellationToken
+                );
+                }
 
             }
         }
