@@ -61,12 +61,12 @@ namespace Flickoo.Telegram
                     [
                         new InlineKeyboardButton
                         {
-                            Text = "Оновити товар",
+                            Text = "✏️ Редагувати",
                             CallbackData = $"update_{productId}"
                         },
                         new InlineKeyboardButton
                         {
-                            Text = "Видалити товар",
+                            Text = "🗑️ Видалити",
                             CallbackData = $"delete_{productId}"
                         }
                     ]

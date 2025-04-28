@@ -10,6 +10,8 @@ using Flickoo.Telegram.DTOs.Media;
 using Flickoo.Telegram.DTOs.User;
 using Microsoft.Extensions.Options;
 
+using TParseMode = Telegram.Bot.Types.Enums.ParseMode;
+
 namespace Flickoo.Telegram.Services
 {
     public class ProductService : IProductService
@@ -63,30 +65,42 @@ namespace Flickoo.Telegram.Services
                         if (products != null)
                         {
                             var productMedias = await _mediaService.GetMediaFromUrlsByProductIdAsync(botClient, product.Id, cancellationToken);
+
+                            var caption =
+                                $"📢 {product.Name}\n" +
+                                $"💰 {product.PriceAmount} {product.PriceCurrency}\n" +
+                                $"📍 {product.LocationName}\n" +
+                                $"📜 Опис: {product.Description}";
                             if (productMedias == null || productMedias.Count == 0)
                             {
                                 await _keyboards.SendReductProductButtons(botClient,
                                     chatId,
                                     product.Id,
-                                    $"📢 {product.Name}\n" +
-                                    $"💰 {product.PriceAmount}  {product.PriceCurrency}\n" +
-                                    $"📍 {product.LocationName}\n" +
-                                    $"──────────────────────────\n" +
-                                    $"📜 Опис: {product.Description}",
+                                    caption,
                                     cancellationToken);
                             }
                             else
                             {
-                                await botClient.SendMediaGroup(chatId, productMedias, cancellationToken: cancellationToken);
 
+                                if (productMedias.Count > 0)
+                                {
+                                    if (productMedias[0] is InputMediaPhoto inputMediaPhoto)
+                                    {
+                                        inputMediaPhoto.Caption = caption;
+                                        inputMediaPhoto.ParseMode = TParseMode.Markdown;
+                                    }
+                                    else if (productMedias[0] is InputMediaVideo inputMediaVideo)
+                                    {
+                                        inputMediaVideo.Caption = caption;
+                                        inputMediaVideo.ParseMode = TParseMode.Markdown;
+                                    }
+                                }
+
+                                await botClient.SendMediaGroup(chatId, productMedias, cancellationToken: cancellationToken);
                                 await _keyboards.SendReductProductButtons(botClient,
                                     chatId,
                                     product.Id,
-                                    $"📢 {product.Name}\n" +
-                                    $"💰 {product.PriceAmount}  {product.PriceCurrency}\n" +
-                                    $"📍 {product.LocationName}\n" +
-                                    $"──────────────────────────\n" +
-                                    $"📜 Опис: {product.Description}",
+                                    "Що хочете зробити з оголошенням?  📦",
                                     cancellationToken);
                             }
                         }
